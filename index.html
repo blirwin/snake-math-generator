@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Snake Worksheet Generator</title>
-  <link rel="stylesheet" href="./styles.css?v=6" />
+  <link rel="stylesheet" href="./styles.css?v=7" />
 </head>
 
 <body>
@@ -35,23 +35,24 @@
       <div class="limits">
         <div class="block">
           <div class="label">Max Add/Sub Amount</div>
-          <input id="maxAddSub" class="input" type="number" min="1" step="1" placeholder="e.g. 10" />
+          <input id="maxAddSub" class="input" type="number" min="1" step="1" value="10" />
           <div class="hint">Used for + and − steps.</div>
         </div>
 
         <div class="block">
           <div class="label">Max Multiply Factor</div>
-          <input id="maxMul" class="input" type="number" min="2" step="1" placeholder="e.g. 6" />
+          <input id="maxMul" class="input" type="number" min="2" step="1" value="10" />
           <div class="hint">Used for × factors (2+).</div>
         </div>
 
         <div class="block">
           <div class="label">Max Divide Divisor</div>
-          <input id="maxDiv" class="input" type="number" min="2" step="1" placeholder="e.g. 6" />
+          <input id="maxDiv" class="input" type="number" min="2" step="1" value="10" />
           <div class="hint">Used for ÷ divisors (2+).</div>
         </div>
       </div>
 
+      <!-- Row 1: ops + main actions -->
       <div class="opsRow">
         <div class="ops">
           <div class="label" style="margin-right:6px;">Allowed operations</div>
@@ -75,21 +76,26 @@
             <input id="allowDiv" type="checkbox" />
             <span>Divide</span>
           </label>
+        </div>
 
+        <div class="actions">
+          <button class="btn primary" onclick="generate()">Generate Puzzles</button>
+          <button class="btn" onclick="printWorksheet()">Print</button>
+        </div>
+      </div>
+
+      <!-- Row 2: answer controls -->
+      <div class="answerRow">
+        <div class="answers">
           <label class="pill" title="Reveal answers on screen (does not regenerate)">
             <input id="showAnswers" type="checkbox" onchange="rerender()" />
-            <span>Show answers</span>
+            <span>Display Answers</span>
           </label>
 
           <label class="pill" title="When printing, add a second page with the answer key">
             <input id="printKey" type="checkbox" />
-            <span>Answer key page</span>
+            <span>Include answer page</span>
           </label>
-        </div>
-
-        <div class="actions">
-          <button class="btn primary" onclick="generate()">Generate (2)</button>
-          <button class="btn" onclick="printWorksheet()">Print</button>
         </div>
       </div>
 
