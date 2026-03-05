@@ -10,7 +10,7 @@
   <div class="page">
     <div class="header">
       <h1>Snake Worksheet Generator</h1>
-      <p class="subhead">Generate printable “snake” math chains with configurable bounds and operations.</p>
+      <p class="subhead">Generate printable snake math chains with configurable bounds and operations.</p>
     </div>
 
     <div class="card controlsCard">
@@ -75,15 +75,14 @@
             <span>Divide</span>
           </label>
 
-          <!-- NEW: rerender existing puzzle without regenerating -->
-          <label class="pill" title="Reveal answers for the current puzzle">
+          <label class="pill" title="Reveal answers for the current puzzles">
             <input id="showAnswers" type="checkbox" onchange="rerender()" />
             <span>Show answers</span>
           </label>
         </div>
 
         <div class="actions">
-          <button class="btn primary" onclick="generate()">Generate</button>
+          <button class="btn primary" onclick="generate()">Generate (2)</button>
           <button class="btn" onclick="window.print()">Print</button>
         </div>
       </div>
@@ -93,7 +92,20 @@
 
     <div class="workspace">
       <div class="sheet">
-        <div id="worksheet"></div>
+        <div class="sheetHeader">
+          <div class="sheetTitle">Puzzle 1</div>
+          <div class="sheetTitle">Puzzle 2</div>
+        </div>
+
+        <div class="twoUp">
+          <div class="puzzleCard">
+            <div id="worksheet1" class="worksheet"></div>
+          </div>
+
+          <div class="puzzleCard">
+            <div id="worksheet2" class="worksheet"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
