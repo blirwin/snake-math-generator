@@ -1,12 +1,4 @@
-// ==============================
-// Global state: two current puzzles
-// ==============================
-
 let CURRENT_PUZZLES = [] // [{ layout, values, ops }, { layout, values, ops }]
-
-// ==============================
-// Helpers
-// ==============================
 
 function mustGetEl(id) {
   const el = document.getElementById(id)
@@ -28,9 +20,7 @@ function readChecked(id) {
 }
 
 function normalizeLayout(rawLayout) {
-  if (!Array.isArray(rawLayout) || rawLayout.length < 3) {
-    throw new Error("Layout missing or too short.")
-  }
+  if (!Array.isArray(rawLayout) || rawLayout.length < 3) throw new Error("Layout missing or too short.")
   return (rawLayout.length % 2 === 0) ? rawLayout.slice(0, -1) : rawLayout
 }
 
@@ -65,10 +55,6 @@ function applyOp(current, op) {
     default: throw new Error("Unknown op type")
   }
 }
-
-// ==============================
-// Read constraints from UI
-// ==============================
 
 function readConstraints() {
   let MIN = readNumber("minBound")
@@ -110,13 +96,8 @@ function readConstraints() {
   }
 
   if (!allowed.length) return { error: "No operations are enabled. Check at least one operation." }
-
   return { MIN, MAX, allowed }
 }
-
-// ==============================
-// Operation generation (bounds-aware)
-// ==============================
 
 function generateOpForCurrent(current, allowedSpecs, MIN, MAX) {
   const MAX_TRIES = 6000
@@ -162,9 +143,14 @@ function generateOpForCurrent(current, allowedSpecs, MIN, MAX) {
   return null
 }
 
-// ==============================
-// Generate ONE puzzle (data only)
-// ==============================
+function validateSnake(values, ops) {
+  for (let i = 0; i < ops.length; i++) {
+    const expected = applyOp(values[i], ops[i])
+    if (expected !== values[i + 1]) return false
+    if (ops[i].type === "div" && !Number.isInteger(values[i + 1])) return false
+  }
+  return true
+}
 
 function generateOnePuzzle(layout, constraints) {
   const steps = (layout.length - 1) / 2
@@ -194,22 +180,15 @@ function generateOnePuzzle(layout, constraints) {
   return { layout, values, ops }
 }
 
-// Make sure puzzle2 is not identical to puzzle1 (rare, but possible)
 function puzzlesEqual(a, b) {
   if (!a || !b) return false
   if (a.values.length !== b.values.length) return false
-  for (let i = 0; i < a.values.length; i++) {
-    if (a.values[i] !== b.values[i]) return false
-  }
+  for (let i = 0; i < a.values.length; i++) if (a.values[i] !== b.values[i]) return false
   for (let i = 0; i < a.ops.length; i++) {
     if (a.ops[i].type !== b.ops[i].type || a.ops[i].n !== b.ops[i].n) return false
   }
   return true
 }
-
-// ==============================
-// Generate TWO puzzles
-// ==============================
 
 function generate() {
   setStatus("")
@@ -221,15 +200,10 @@ function generate() {
     return
   }
 
-  // Try a few times to get two distinct puzzles under tight constraints
   const MAX_ATTEMPTS = 40
+  let p1 = null, p2 = null
 
-  let p1 = null
-  let p2 = null
-
-  for (let a = 0; a < MAX_ATTEMPTS && !p1; a++) {
-    p1 = generateOnePuzzle(layout, constraints)
-  }
+  for (let a = 0; a < MAX_ATTEMPTS && !p1; a++) p1 = generateOnePuzzle(layout, constraints)
   if (!p1) {
     setStatus("Could not generate Puzzle 1 with these constraints. Widen bounds or allow more operations.")
     return
@@ -247,45 +221,6 @@ function generate() {
   CURRENT_PUZZLES = [p1, p2]
   rerender()
 }
-
-// ==============================
-// Rerender without regenerating
-// ==============================
-
-function rerender() {
-  if (!CURRENT_PUZZLES.length) {
-    setStatus("No puzzles yet. Click Generate.")
-    return
-  }
-
-  const showAnswers = readChecked("showAnswers")
-
-  renderTo("worksheet1", CURRENT_PUZZLES[0], showAnswers)
-  renderTo("worksheet2", CURRENT_PUZZLES[1], showAnswers)
-}
-
-// ==============================
-// Validation
-// ==============================
-
-function validateSnake(values, ops) {
-  for (let i = 0; i < ops.length; i++) {
-    const expected = applyOp(values[i], ops[i])
-    if (expected !== values[i + 1]) {
-      console.error("Snake mismatch at step", i, { left: values[i], op: ops[i], right: values[i + 1], expected })
-      return false
-    }
-    if (ops[i].type === "div" && !Number.isInteger(values[i + 1])) {
-      console.error("Non-integer division result at step", i)
-      return false
-    }
-  }
-  return true
-}
-
-// ==============================
-// Rendering
-// ==============================
 
 function renderTo(containerId, puzzle, showAnswers) {
   const grid = mustGetEl(containerId)
@@ -318,6 +253,45 @@ function renderTo(containerId, puzzle, showAnswers) {
 
     grid.appendChild(cell)
   })
+}
+
+function rerender() {
+  if (!CURRENT_PUZZLES.length) {
+    setStatus("No puzzles yet. Click Generate.")
+    return
+  }
+  const showAnswers = readChecked("showAnswers")
+  renderTo("worksheet1", CURRENT_PUZZLES[0], showAnswers)
+  renderTo("worksheet2", CURRENT_PUZZLES[1], showAnswers)
+}
+
+/**
+ * Print behavior:
+ * - Always prints student puzzles
+ * - If "Answer key page" is checked, prints a second page with answers revealed
+ */
+function printWorksheet() {
+  if (!CURRENT_PUZZLES.length) {
+    setStatus("No puzzles yet. Click Generate.")
+    return
+  }
+
+  const wantsKeyPage = readChecked("printKey")
+
+  if (wantsKeyPage) {
+    // Render key pages with answers ALWAYS revealed (independent of showAnswers toggle)
+    renderTo("key1", CURRENT_PUZZLES[0], true)
+    renderTo("key2", CURRENT_PUZZLES[1], true)
+
+    document.body.classList.add("printingWithKey")
+  } else {
+    document.body.classList.remove("printingWithKey")
+  }
+
+  window.print()
+
+  // Cleanup: remove key mode so screen view stays normal
+  document.body.classList.remove("printingWithKey")
 }
 
 // Auto-generate on load
