@@ -9,7 +9,6 @@
   --radius: 14px;
   --radius-sm: 10px;
 
-  /* puzzle sizing (screen) */
   --cell-w: 102px;
   --cell-h: 82px;
   --cell-gap: 16px;
@@ -59,83 +58,9 @@ html, body{
   padding: 18px;
 }
 
-/* Callout */
-.callout{
-  border: 1px solid var(--border);
-  background: #fbfbfd;
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-bottom: 14px;
-}
-.calloutTitle{
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-.calloutText{
-  font-size: 13px;
-  line-height: 1.4;
-  color: #374151;
-}
+/* Controls (keep what you already had; this is just safe defaults) */
+.controlsCard{ }
 
-/* Inputs */
-.inputPanel{
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  background: #fff;
-}
-
-.inputRow{
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 22px;
-  align-items: center;
-}
-.inputRow + .inputRow{ margin-top: 12px; }
-
-.fieldInline{
-  display: inline-flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.labelInline{
-  font-size: 13px;
-  font-weight: 800;
-  color: #374151;
-  min-width: 120px;
-}
-
-.inputSmall{
-  width: 8ch;
-  min-width: 8ch;
-  max-width: 8ch;
-  padding: 10px 12px;
-  font-size: 15px;
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  background: #fff;
-  outline: none;
-  text-align: center;
-}
-
-.inputSmall:focus{
-  border-color: #9ca3af;
-  box-shadow: 0 0 0 3px rgba(17,24,39,0.08);
-}
-
-.miniHint{
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-/* Section headers */
 .sectionHeader{
   margin-top: 16px;
   margin-bottom: 10px;
@@ -146,7 +71,6 @@ html, body{
   text-transform: uppercase;
 }
 
-/* Pills */
 .pillRow{
   display: flex;
   flex-wrap: wrap;
@@ -164,19 +88,10 @@ html, body{
   background: #fbfbfd;
 }
 
-.pillTight{
-  padding: 10px 12px;
-}
-
+.pillTight{ padding: 10px 12px; }
 .pill input{ width: 18px; height: 18px; }
+.pill span{ font-size: 14px; font-weight: 800; color: #111827; }
 
-.pill span{
-  font-size: 14px;
-  font-weight: 800;
-  color: #111827;
-}
-
-/* Buttons row */
 .actionRow{
   margin-top: 16px;
   display: flex;
@@ -202,6 +117,7 @@ html, body{
   color: #fff;
   border-color: #111827;
 }
+
 .btn.primary:hover{ background: #0b1220; }
 
 .status{
@@ -254,7 +170,7 @@ html, body{
   overflow: hidden;
 }
 
-/* Wrapper used for screen-fit scaling */
+/* Screen-fit scaling wrapper */
 .worksheetSizer{
   transform-origin: top left;
   transform: scale(var(--scale, 1));
@@ -262,7 +178,6 @@ html, body{
   height: var(--grid-h, auto);
 }
 
-/* Grid */
 .worksheet{
   display: grid;
   gap: var(--cell-gap);
@@ -273,7 +188,6 @@ html, body{
   overflow: visible;
 }
 
-/* Cells */
 .cell{
   width: var(--cell-w);
   height: var(--cell-h);
@@ -290,20 +204,12 @@ html, body{
 .cell.op{ background: #e5e7eb; }
 .cell.blank{ background: #fff; }
 
-/* Answer key hidden on screen */
+/* Answer page hidden on screen by default */
 .answerKeySection{ display: none; }
 
-/* Page break element (only relevant to print) */
-.pageBreak{ display: none; }
-
-@media (max-width: 980px){
-  .page{ padding: 24px 18px 32px; }
-  .labelInline{ min-width: 110px; }
-}
-
-@media (max-width: 560px){
-  .labelInline{ min-width: auto; }
-  .miniHint{ white-space: normal; }
+/* This must exist in DOM for print, but can be hidden on screen */
+.pageBreak{
+  display: none;
 }
 
 /* PRINT */
@@ -328,18 +234,18 @@ html, body{
     margin: 0;
   }
 
-  .controlsCard{ display: none; }
+  .controlsCard{ display: none !important; }
 
   .sheet{
-    box-shadow: none;
-    border: none;
-    padding: 0;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
   }
 
   .puzzleCard{
-    border: none;
-    padding: 0;
-    overflow: visible;
+    border: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
   }
 
   .cell{
@@ -347,27 +253,32 @@ html, body{
     font-size: 22px;
   }
 
+  /* keep grey shading on ops */
   .cell.op{
     background: #e5e7eb !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* CRITICAL: avoid iOS overlap by removing transforms in print */
+  /* CRITICAL: iOS print + transforms can overlap content */
   .worksheetSizer{
     transform: none !important;
     width: auto !important;
     height: auto !important;
   }
 
-  /* Answer key printing control */
+  /* Only show answer page when we explicitly enable it */
   .answerKeySection{ display: none !important; }
   body.printingWithKey .answerKeySection{ display: block !important; }
 
-  /* Page break between puzzles and answer page */
+  /*
+    CRITICAL: page break must generate a box. Empty divs can be ignored in print layout.
+    Give it minimal height so page-break applies reliably. :contentReference[oaicite:1]{index=1}
+  */
   .pageBreak{
-    display: block;
+    display: block !important;
+    height: 1px;                 /* generates a box */
     break-before: page;
-    page-break-before: always;
+    page-break-before: always;   /* legacy */
   }
 }
