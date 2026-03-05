@@ -1,52 +1,74 @@
-function randInt(max){
-  return Math.floor(Math.random()*max)
-}
+function getSeed(){
 
-function randOp(max){
-  let val = randInt(max*2+1)-max
-  return val
+const params = new URLSearchParams(window.location.search)
+return parseInt(params.get("seed")) || Math.floor(Math.random()*100000)
+
 }
 
 function generate(){
 
-  let start = parseInt(document.getElementById("start").value)
-  let length = parseInt(document.getElementById("length").value)
-  let diff = parseInt(document.getElementById("difficulty").value)
+const seed = getSeed()
 
-  let values = [start]
-  let ops = []
+let rand = () => seededRandom(seed + Math.random())
 
-  for(let i=0;i<length;i++){
+const layout = layouts.snake1
 
-    let op = randOp(diff)
+let start = Math.floor(rand()*10)+1
 
-    ops.push(op)
+let ops = []
+let values = [start]
 
-    values.push(values[i]+op)
-  }
+for(let i=1;i<layout.length;i++){
 
-  render(values,ops)
+let op = Math.floor(rand()*9)-4
+
+ops.push(op)
+
+values.push(values[i-1] + op)
+
 }
 
-function render(values,ops){
+render(layout,values,ops)
 
-  let layout = createSnakeLayout(values.length)
+}
 
-  let html = ""
+function render(layout,values,ops){
 
-  for(let i=0;i<layout.length;i++){
+const grid = document.getElementById("worksheet")
 
-    let v = values[i]
+grid.innerHTML = ""
 
-    if(i===0){
-      html += `<div class="cell">${v}</div>`
-    }else{
-      let op = ops[i-1]
-      let sign = op>=0?`+${op}`:op
-      html += `<div class="cell op">${sign}</div>`
-      html += `<div class="cell blank"></div>`
-    }
-  }
+layout.forEach((pos,i)=>{
 
-  document.getElementById("worksheet").innerHTML = html
+let cell = document.createElement("div")
+
+cell.className = "cell"
+
+cell.style.gridColumn = pos[0]+1
+cell.style.gridRow = pos[1]+1
+
+if(i===0){
+
+cell.innerText = values[0]
+
+}else{
+
+if(i%2==1){
+
+let op = ops[i-1]
+cell.innerText = op>=0 ? "+"+op : op
+cell.classList.add("op")
+
+}else{
+
+cell.classList.add("blank")
+
+}
+
+}
+
+grid.appendChild(cell)
+
+})
+
 }
