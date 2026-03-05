@@ -1,66 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-
-<meta charset="UTF-8">
-
-<title>Snake Worksheet Generator</title>
-
-<link rel="stylesheet" href="styles.css">
-
-<style>
-
-body{
-  font-family: Arial;
-  padding:40px;
-}
-
-.controls{
-  margin-bottom:25px;
-}
-
-.controls label{
-  margin-right:6px;
-}
-
-.controls input{
-  width:80px;
-  margin-right:15px;
-}
-
-button{
-  padding:6px 12px;
-  font-size:14px;
-}
-
-</style>
-
+  <meta charset="UTF-8" />
+  <title>Snake Worksheet Generator</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { font-family: Arial; padding: 40px; }
+    .controls { margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: center; }
+    .controls label { margin-right: 6px; }
+    .controls input[type="number"] { width: 110px; }
+    .ops { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; }
+    .ops .group { display: flex; gap: 10px; align-items: center; }
+    button { padding: 8px 14px; font-size: 14px; }
+    .hint { color: #555; font-size: 12px; margin-top: 6px; }
+  </style>
 </head>
 
 <body>
+  <h1>Snake Worksheet Generator</h1>
 
-<h1>Snake Worksheet Generator</h1>
+  <div class="controls">
+    <div>
+      <label for="minBound">Min Bound</label>
+      <input id="minBound" type="number" placeholder="(blank = no min)" />
+    </div>
 
-<div class="controls">
+    <div>
+      <label for="maxBound">Max Bound</label>
+      <input id="maxBound" type="number" placeholder="(blank = no max)" />
+    </div>
 
-<label>Min Bound</label>
-<input id="minBound" type="number" placeholder="-10">
+    <div>
+      <label for="maxOp">Max Operation Size</label>
+      <input id="maxOp" type="number" value="4" min="1" step="1" />
+      <div class="hint">Used for +/− amount, × factor, and ÷ divisor.</div>
+    </div>
 
-<label>Max Bound</label>
-<input id="maxBound" type="number" placeholder="10">
+    <div class="ops">
+      <span>Allowed operations:</span>
+      <div class="group">
+        <label><input id="allowAdd" type="checkbox" checked /> Addition</label>
+        <label><input id="allowSub" type="checkbox" checked /> Subtraction</label>
+        <label><input id="allowMul" type="checkbox" /> Multiplication</label>
+        <label><input id="allowDiv" type="checkbox" /> Division</label>
+      </div>
+    </div>
 
-<label>Max Operation Size</label>
-<input id="maxOp" type="number" value="4">
+    <button onclick="generate()">Generate Puzzle</button>
+    <button onclick="window.print()">Print</button>
+  </div>
 
-<button onclick="generate()">Generate Puzzle</button>
+  <div id="worksheet"></div>
 
-</div>
-
-<div id="worksheet"></div>
-
-
-<script src="snakeLayouts.js"></script>
-<script src="generator.js"></script>
-
+  <script src="snakeLayouts.js"></script>
+  <script src="generator.js"></script>
 </body>
 </html>
