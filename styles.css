@@ -108,40 +108,32 @@ html, body{
   gap: var(--gap);
 }
 
-/* Row 1: ops + actions */
-.opsRow{
+/* New 3-row controls */
+.controlRow{
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.rowLabel{
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.rowContent{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+
+.buttonRow{
   margin-top: 14px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 14px 18px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.ops{
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  align-items: center;
-}
-
-.actions{
-  display: flex;
   gap: 10px;
-  align-items: center;
-}
-
-/* Row 2: answer controls */
-.answerRow{
-  margin-top: 10px;
-  display: flex;
-  justify-content: flex-start;
-}
-
-.answers{
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
   align-items: center;
 }
 
@@ -169,7 +161,7 @@ html, body{
   border-radius: 12px;
   padding: 10px 14px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -222,19 +214,17 @@ html, body{
   padding-left: 2px;
 }
 
-/* Container never breaks out */
+/* Puzzle container */
 .puzzleCard{
   max-width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px;
   background: #fff;
-
-  /* IMPORTANT: allow scaled content to be visible */
-  overflow: hidden;
+  overflow: hidden; /* no scrollbars, no breakouts */
 }
 
-/* This wrapper is what we scale */
+/* Scaled wrapper */
 .worksheetSizer{
   transform-origin: top left;
   transform: scale(var(--scale, 1));
@@ -242,7 +232,7 @@ html, body{
   height: var(--grid-h, 0px);
 }
 
-/* The visible grid */
+/* The grid itself */
 .worksheet{
   display: grid;
   gap: var(--cell-gap);
@@ -250,8 +240,6 @@ html, body{
 
   grid-auto-columns: var(--cell-w);
   grid-auto-rows: var(--cell-h);
-
-  /* cols/rows set per-puzzle by JS */
   grid-template-columns: repeat(var(--cols, 12), var(--cell-w));
 }
 
@@ -274,14 +262,13 @@ html, body{
 
 /* Answer key hidden on screen */
 .answerKeySection{ display: none; }
-
 .pageBreak{ display: block; }
 
 /* Responsive */
 @media (max-width: 980px){
   .controls{ grid-template-columns: 1fr; }
   .limits{ grid-template-columns: 1fr; }
-  .opsRow{ align-items: flex-start; }
+  .controlRow{ grid-template-columns: 1fr; }
 }
 
 /* Print */
@@ -289,13 +276,17 @@ html, body{
   :root{
     --bg: #ffffff;
     --shadow: none;
-
     --cell-w: 90px;
     --cell-h: 72px;
     --cell-gap: 12px;
   }
 
-  body{ background: #fff; }
+  /* Encourage browsers to keep backgrounds */
+  body{
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  } /* :contentReference[oaicite:2]{index=2} */
 
   .page{
     padding: 0;
@@ -311,7 +302,7 @@ html, body{
     padding: 0;
   }
 
-  .sheet{ margin-top: 22px; }
+  .sheet{ margin-top: 18px; }
 
   .puzzleCard{
     border: none;
@@ -324,6 +315,13 @@ html, body{
     font-size: 22px;
   }
 
+  /* Ensure gray op shading prints */
+  .cell.op{
+    background: #e5e7eb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  } /* :contentReference[oaicite:3]{index=3} */
+
   .pageBreak{
     break-before: page;
     page-break-before: always;
@@ -332,8 +330,6 @@ html, body{
   .answerKeySection{ display: none; }
   body.printingWithKey .answerKeySection{ display: block; }
 
-  /* In print we generally want 1:1 scale (fit should already be fine with smaller cells) */
-  .worksheetSizer{
-    transform: scale(1);
-  }
+  /* In print, keep scale 1 (cells already smaller) */
+  .worksheetSizer{ transform: scale(1); }
 }
