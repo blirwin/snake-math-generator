@@ -1,6 +1,7 @@
-// -----------------------------
-// 1. Read seed from URL
-// -----------------------------
+// ==============================
+// Seed handling
+// ==============================
+
 function getSeed() {
 
   const params = new URLSearchParams(window.location.search)
@@ -11,7 +12,7 @@ function getSeed() {
     seed = Math.floor(Math.random() * 100000)
   }
 
-  // update URL so teacher can copy it
+  // update URL so it can be shared
   history.replaceState(null, "", "?seed=" + seed)
 
   return seed
@@ -19,25 +20,29 @@ function getSeed() {
 
 
 
-// -----------------------------
-// 2. Deterministic RNG
-// -----------------------------
+// ==============================
+// Deterministic RNG
+// ==============================
+
 function seededRandom(seed) {
+
   let x = Math.sin(seed) * 10000
   return x - Math.floor(x)
+
 }
 
 
 
-// -----------------------------
-// 3. Generate puzzle
-// -----------------------------
+// ==============================
+// Main generator
+// ==============================
+
 function generate() {
 
   let seed = getSeed()
 
-  // seeded RNG with advancing state
-  let rand = () => {
+  // RNG with advancing state
+  function rand() {
     seed += 1
     return seededRandom(seed)
   }
@@ -46,20 +51,23 @@ function generate() {
 
   let start = Math.floor(rand() * 10) + 1
 
-  let ops = []
   let values = [start]
+  let ops = []
 
-  // generate snake values
-  for (let i = 1; i < layout.length; i++) {
+  const steps = Math.floor((layout.length - 1) / 2)
 
-    let op = Math.floor(rand() * 9) - 4
+  for (let i = 0; i < steps; i++) {
 
-    let next = values[i - 1] + op
+    let op
 
-    // -----------------------------
-    // 4. bounds control
-    // prevents huge numbers
-    // -----------------------------
+    // generate operations excluding +0
+    do {
+      op = Math.floor(rand() * 9) - 4
+    } while (op === 0)
+
+    let next = values[i] + op
+
+    // keep numbers readable
     if (next < -20 || next > 50) {
       i--
       continue
@@ -70,16 +78,8 @@ function generate() {
 
   }
 
-  // -----------------------------
-  // 5. Debug correctness check
-  // -----------------------------
-  for (let i = 0; i < ops.length; i++) {
-
-    if (values[i] + ops[i] !== values[i + 1]) {
-      console.error("Snake math mismatch", i)
-    }
-
-  }
+  // sanity check
+  validateSnake(values, ops)
 
   render(layout, values, ops)
 
@@ -87,9 +87,30 @@ function generate() {
 
 
 
-// -----------------------------
-// 6. Render snake grid
-// -----------------------------
+// ==============================
+// Validation (debug)
+// ==============================
+
+function validateSnake(values, ops) {
+
+  for (let i = 0; i < ops.length; i++) {
+
+    if (values[i] + ops[i] !== values[i + 1]) {
+
+      console.error("Snake math error at step", i)
+
+    }
+
+  }
+
+}
+
+
+
+// ==============================
+// Rendering
+// ==============================
+
 function render(layout, values, ops) {
 
   const grid = document.getElementById("worksheet")
@@ -109,15 +130,19 @@ function render(layout, values, ops) {
 
       cell.innerText = values[0]
 
-    } else if (i % 2 === 1) {
+    }
 
-      let op = ops[Math.floor(i / 2)]
+    else if (i % 2 === 1) {
 
-      cell.innerText = op >= 0 ? "+" + op : op
+      let op = ops[(i - 1) / 2]
+
+      cell.innerText = op > 0 ? "+" + op : op
 
       cell.classList.add("op")
 
-    } else {
+    }
+
+    else {
 
       cell.classList.add("blank")
 
@@ -131,7 +156,8 @@ function render(layout, values, ops) {
 
 
 
-// -----------------------------
-// auto-generate on page load
-// -----------------------------
+// ==============================
+// Auto-generate on load
+// ==============================
+
 generate()
