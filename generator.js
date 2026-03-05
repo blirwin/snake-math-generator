@@ -1,16 +1,12 @@
 /* global layouts */
 
 const CURRENT = {
-  puzzles: [], // [{ layoutName, layout, cols, rows, values, ops }]
+  puzzles: [], // [{ layoutName, layout, cols, rows, valuesByPath, opsByPath }]
 };
 
-function $(id) {
-  return document.getElementById(id);
-}
+function $(id) { return document.getElementById(id); }
 
-function setStatus(msg) {
-  $("status").textContent = msg || "";
-}
+function setStatus(msg) { $("status").textContent = msg || ""; }
 
 function readChecked(id) {
   const el = $(id);
@@ -32,21 +28,26 @@ function readRequiredInt(id, minValue) {
   if (raw === "") return null;
   const n = Number(raw);
   if (!Number.isFinite(n)) return null;
-  if (minValue != null && n < minValue) return null;
-  return Math.floor(n);
+  const f = Math.floor(n);
+  if (minValue != null && f < minValue) return null;
+  return f;
 }
 
-function getAllowedOps() {
-  const allowed = [];
-  if (readChecked("allowAdd")) allowed.push("add");
-  if (readChecked("allowSub")) allowed.push("sub");
-  if (readChecked("allowMul")) allowed.push("mul");
-  if (readChecked("allowDiv")) allowed.push("div");
-  return allowed;
+function getAllowedKinds() {
+  const kinds = [];
+  if (readChecked("allowAdd")) kinds.push("add");
+  if (readChecked("allowSub")) kinds.push("sub");
+  if (readChecked("allowMul")) kinds.push("mul");
+  if (readChecked("allowDiv")) kinds.push("div");
+  return kinds;
 }
 
 function randInt(minIncl, maxIncl) {
   return Math.floor(Math.random() * (maxIncl - minIncl + 1)) + minIncl;
+}
+
+function pickOne(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 function withinBounds(x, minB, maxB) {
@@ -55,11 +56,8 @@ function withinBounds(x, minB, maxB) {
   return true;
 }
 
-function pickOne(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
 function formatOp(op) {
+  if (!op) return ""; // defensive
   switch (op.kind) {
     case "add": return `+${op.n}`;
     case "sub": return `-${op.n}`;
@@ -79,10 +77,19 @@ function applyOp(v, op) {
   }
 }
 
+function effectiveKinds(allowed, maxAddSub, maxMul, maxDiv) {
+  return allowed.filter(k => {
+    if ((k === "add" || k === "sub") && maxAddSub == null) return false;
+    if (k === "mul" && maxMul == null) return false;
+    if (k === "div" && maxDiv == null) return false;
+    return true;
+  });
+}
+
 /**
- * layout: array of [col,row] positions in path order.
- * Convention: i=0 start value; odd i are op cells; even i are value cells.
- * Last cell (i == layout.length-1) is a VALUE cell and is shown (final answer).
+ * Generate based on actual path indices, so ops and values always line up with the layout.
+ * valuesByPath[pathIndex] is defined for even indices (0,2,4,...)
+ * opsByPath[pathIndex] is defined for odd indices (1,3,5,...)
  */
 function generatePuzzle(layoutName = "snake1") {
   const layout = layouts[layoutName];
@@ -90,54 +97,35 @@ function generatePuzzle(layoutName = "snake1") {
     throw new Error(`Missing/invalid layout: ${layoutName}`);
   }
 
-  // derive grid size from layout
   const cols = Math.max(...layout.map(p => p[0] + 1));
   const rows = Math.max(...layout.map(p => p[1] + 1));
 
   const minB = readIntOrNull("minBound");
   const maxB = readIntOrNull("maxBound");
 
-  const allowedKinds = getAllowedOps();
-  if (allowedKinds.length === 0) {
-    throw new Error("Select at least one operation.");
-  }
+  const allowed = getAllowedKinds();
+  if (allowed.length === 0) throw new Error("Select at least one operation.");
 
-  // Max factors (blank means disallow that op even if checked)
   const maxAddSub = readRequiredInt("maxAddSub", 1);
   const maxMul = readRequiredInt("maxMul", 2);
   const maxDiv = readRequiredInt("maxDiv", 2);
 
-  // Validate: if an op is checked, require its max
-  if (readChecked("allowAdd") && (maxAddSub == null)) throw new Error("Enter Max Add/Sub (≥ 1) or uncheck Add.");
-  if (readChecked("allowSub") && (maxAddSub == null)) throw new Error("Enter Max Add/Sub (≥ 1) or uncheck Subtract.");
-  if (readChecked("allowMul") && (maxMul == null)) throw new Error("Enter Max Multiply (≥ 2) or uncheck Multiply.");
-  if (readChecked("allowDiv") && (maxDiv == null)) throw new Error("Enter Max Divide (≥ 2) or uncheck Divide.");
+  // If checked, require max
+  if (readChecked("allowAdd") && maxAddSub == null) throw new Error("Enter Max Add/Sub (≥ 1) or uncheck Add.");
+  if (readChecked("allowSub") && maxAddSub == null) throw new Error("Enter Max Add/Sub (≥ 1) or uncheck Subtract.");
+  if (readChecked("allowMul") && maxMul == null) throw new Error("Enter Max Multiply (≥ 2) or uncheck Multiply.");
+  if (readChecked("allowDiv") && maxDiv == null) throw new Error("Enter Max Divide (≥ 2) or uncheck Divide.");
 
-  // Build a candidate generator list from allowedKinds + available max inputs
-  const effectiveKinds = allowedKinds.filter(k => {
-    if ((k === "add" || k === "sub") && maxAddSub == null) return false;
-    if (k === "mul" && maxMul == null) return false;
-    if (k === "div" && maxDiv == null) return false;
-    return true;
-  });
+  const kinds = effectiveKinds(allowed, maxAddSub, maxMul, maxDiv);
+  if (kinds.length === 0) throw new Error("No operations are usable (checked + max values).");
 
-  if (effectiveKinds.length === 0) {
-    throw new Error("No operations are usable (check boxes + provide max values).");
-  }
-
-  // How many value nodes?
-  // layout indices 0..L-1, value nodes are even indices
-  const valueCount = Math.floor((layout.length + 1) / 2);
-  const opCount = valueCount - 1;
-
-  // Attempt generation with retries
-  const MAX_RESTARTS = 200;
+  const MAX_RESTARTS = 250;
 
   for (let attempt = 0; attempt < MAX_RESTARTS; attempt++) {
-    const values = [];
-    const ops = [];
+    const valuesByPath = {}; // even indices only
+    const opsByPath = {};    // odd indices only
 
-    // pick a start value that satisfies bounds (or random reasonable range if no bounds)
+    // start value
     let start;
     if (minB != null || maxB != null) {
       const lo = (minB != null) ? minB : -20;
@@ -148,66 +136,72 @@ function generatePuzzle(layoutName = "snake1") {
     }
     if (!withinBounds(start, minB, maxB)) continue;
 
-    values.push(start);
+    valuesByPath[0] = start;
 
     let ok = true;
 
-    for (let i = 0; i < opCount; i++) {
-      const cur = values[i];
-
-      // Try multiple ops to find one that keeps next in bounds and (for div) integer
-      const MAX_STEP_TRIES = 200;
-      let chosen = null;
-      let nextVal = null;
-
-      for (let t = 0; t < MAX_STEP_TRIES; t++) {
-        const kind = pickOne(effectiveKinds);
+    // walk the path index-by-index
+    for (let pathIndex = 1; pathIndex < layout.length; pathIndex++) {
+      if (pathIndex % 2 === 1) {
+        // op cell: choose an op that can lead to a valid next value later
+        // We pick op now, but validate when we try to compute next even value.
+        // Still, we can just store it; validation happens next step.
+        const kind = pickOne(kinds);
 
         let op;
-        if (kind === "add") {
-          op = { kind, n: randInt(1, maxAddSub) };
-        } else if (kind === "sub") {
-          op = { kind, n: randInt(1, maxAddSub) };
-        } else if (kind === "mul") {
-          op = { kind, n: randInt(2, maxMul) };
-        } else { // div
-          op = { kind, n: randInt(2, maxDiv) };
+        if (kind === "add") op = { kind, n: randInt(1, maxAddSub) };
+        else if (kind === "sub") op = { kind, n: randInt(1, maxAddSub) };
+        else if (kind === "mul") op = { kind, n: randInt(2, maxMul) };
+        else op = { kind, n: randInt(2, maxDiv) };
+
+        opsByPath[pathIndex] = op;
+      } else {
+        // value cell: compute from previous value and previous op
+        const prevValueIndex = pathIndex - 2;
+        const opIndex = pathIndex - 1;
+
+        const prevVal = valuesByPath[prevValueIndex];
+        const op = opsByPath[opIndex];
+
+        if (prevVal == null || !op) {
+          ok = false;
+          break;
         }
 
-        // apply and validate
-        let candidate = applyOp(cur, op);
+        let candidate = applyOp(prevVal, op);
 
         // division must be integer
-        if (op.kind === "div") {
-          if (!Number.isInteger(candidate)) continue;
+        if (op.kind === "div" && !Number.isInteger(candidate)) {
+          ok = false;
+          break;
         }
 
-        if (!withinBounds(candidate, minB, maxB)) continue;
+        if (!withinBounds(candidate, minB, maxB)) {
+          ok = false;
+          break;
+        }
 
-        chosen = op;
-        nextVal = candidate;
-        break;
+        valuesByPath[pathIndex] = candidate;
       }
-
-      if (!chosen) {
-        ok = false;
-        break;
-      }
-
-      ops.push(chosen);
-      values.push(nextVal);
     }
 
+    // If we failed due to a bad op choice, restart. This is simplest and robust.
     if (!ok) continue;
 
-    return { layoutName, layout, cols, rows, values, ops };
+    // Ensure last cell is a value cell; if it's not, your layout is invalid for this puzzle model.
+    if ((layout.length - 1) % 2 !== 0) {
+      throw new Error("Layout must end on a VALUE cell (even index). Your snake layout ends on an operation cell.");
+    }
+
+    return { layoutName, layout, cols, rows, valuesByPath, opsByPath };
   }
 
   throw new Error("Could not generate a puzzle with those constraints. Loosen bounds or reduce Multiply/Divide.");
 }
 
+/* ===== Rendering + scaling ===== */
+
 function ensureSizer(gridEl) {
-  // Wrap the grid in a sizer div if not already
   const parent = gridEl.parentElement;
   if (parent && parent.classList && parent.classList.contains("worksheetSizer")) return parent;
 
@@ -218,30 +212,25 @@ function ensureSizer(gridEl) {
   return sizer;
 }
 
-function measurePuzzlePixelSize(gridEl, cols, rows) {
+function measurePuzzlePixelSize(cols, rows) {
   const cs = getComputedStyle(document.documentElement);
   const cellW = parseFloat(cs.getPropertyValue("--cell-w")) || 100;
   const cellH = parseFloat(cs.getPropertyValue("--cell-h")) || 80;
   const gap = parseFloat(cs.getPropertyValue("--cell-gap")) || 16;
 
-  const width = cols * cellW + (cols - 1) * gap;
-  const height = rows * cellH + (rows - 1) * gap;
-  return { width, height };
+  return {
+    width: cols * cellW + (cols - 1) * gap,
+    height: rows * cellH + (rows - 1) * gap
+  };
 }
 
 function renderTo(targetId, puzzle, showAnswers) {
   const grid = $(targetId);
   if (!grid) return;
 
-  // Clear and set grid dimensions
   grid.innerHTML = "";
   grid.style.setProperty("--cols", puzzle.cols);
-  // We use rows implicitly by positions; still, keep it for sizing
-  // (not strictly necessary for CSS, but useful)
-  grid.style.setProperty("--rows", puzzle.rows);
 
-  // Map path index to value index
-  // value indices are even path indices: 0,2,4,...
   const lastPathIndex = puzzle.layout.length - 1;
 
   puzzle.layout.forEach((pos, pathIndex) => {
@@ -251,21 +240,16 @@ function renderTo(targetId, puzzle, showAnswers) {
     cell.style.gridRow = (pos[1] + 1);
 
     if (pathIndex === 0) {
-      // start value shown
-      cell.textContent = String(puzzle.values[0]);
+      cell.textContent = String(puzzle.valuesByPath[0]);
     } else if (pathIndex % 2 === 1) {
-      // op cell shown
-      const op = puzzle.ops[(pathIndex - 1) / 2];
+      const op = puzzle.opsByPath[pathIndex];
       cell.textContent = formatOp(op);
       cell.classList.add("op");
     } else {
-      // value cell
-      const valueIndex = pathIndex / 2;
-      const val = puzzle.values[valueIndex];
-
+      const val = puzzle.valuesByPath[pathIndex];
       const isFinal = (pathIndex === lastPathIndex);
+
       if (isFinal) {
-        // final answer ALWAYS shown
         cell.textContent = String(val);
       } else if (showAnswers) {
         cell.textContent = String(val);
@@ -278,15 +262,13 @@ function renderTo(targetId, puzzle, showAnswers) {
     grid.appendChild(cell);
   });
 
-  // Fit-to-container scaling for SCREEN only (print will disable transforms)
+  // Screen-fit scaling only
   const sizer = ensureSizer(grid);
+  const { width, height } = measurePuzzlePixelSize(puzzle.cols, puzzle.rows);
 
-  // compute intrinsic pixel size of the whole grid area
-  const { width, height } = measurePuzzlePixelSize(grid, puzzle.cols, puzzle.rows);
   sizer.style.setProperty("--grid-w", `${width}px`);
   sizer.style.setProperty("--grid-h", `${height}px`);
 
-  // available width is puzzleCard content box width
   const puzzleCard = sizer.closest(".puzzleCard");
   let avail = 0;
   if (puzzleCard) {
@@ -297,15 +279,29 @@ function renderTo(targetId, puzzle, showAnswers) {
     avail = rect.width - padL - padR;
   }
 
-  // scale down only if needed (never scale up)
   let scale = 1;
-  if (avail > 0 && width > 0) {
-    scale = Math.min(1, avail / width);
-  }
+  if (avail > 0 && width > 0) scale = Math.min(1, avail / width);
+
   sizer.style.setProperty("--scale", scale.toString());
   sizer.style.width = `${width}px`;
   sizer.style.height = `${height}px`;
 }
+
+function clearSizerInline(targetId) {
+  const grid = $(targetId);
+  if (!grid) return;
+  const sizer = grid.parentElement;
+  if (!sizer || !sizer.classList.contains("worksheetSizer")) return;
+
+  sizer.style.transform = "";
+  sizer.style.removeProperty("--scale");
+  sizer.style.width = "";
+  sizer.style.height = "";
+  sizer.style.removeProperty("--grid-w");
+  sizer.style.removeProperty("--grid-h");
+}
+
+/* ===== App actions ===== */
 
 function rerender() {
   if (CURRENT.puzzles.length !== 2) return;
@@ -315,7 +311,7 @@ function rerender() {
   renderTo("worksheet1", CURRENT.puzzles[0], show);
   renderTo("worksheet2", CURRENT.puzzles[1], show);
 
-  // keep keys up to date too (used for printing with key)
+  // keys always rendered; shown only when printingWithKey
   renderTo("key1", CURRENT.puzzles[0], true);
   renderTo("key2", CURRENT.puzzles[1], true);
 }
@@ -323,54 +319,27 @@ function rerender() {
 function generate() {
   try {
     setStatus("");
-
     const p1 = generatePuzzle("snake1");
     const p2 = generatePuzzle("snake1");
-
     CURRENT.puzzles = [p1, p2];
-
     rerender();
   } catch (e) {
     setStatus(e.message || String(e));
   }
 }
 
-function clearSizerInline(targetId) {
-  const grid = $(targetId);
-  if (!grid) return;
-  const sizer = grid.parentElement;
-  if (!sizer || !sizer.classList || !sizer.classList.contains("worksheetSizer")) return;
-
-  // Remove inline size/scale so print CSS can lay out naturally
-  sizer.style.transform = "";
-  sizer.style.removeProperty("--scale");
-  sizer.style.width = "";
-  sizer.style.height = "";
-  sizer.style.removeProperty("--grid-w");
-  sizer.style.removeProperty("--grid-h");
-}
-
 function prepareForPrint(includeKey) {
-  // Ensure latest on-screen state is rendered
-  const show = readChecked("showAnswers");
-  renderTo("worksheet1", CURRENT.puzzles[0], show);
-  renderTo("worksheet2", CURRENT.puzzles[1], show);
+  if (includeKey) document.body.classList.add("printingWithKey");
+  else document.body.classList.remove("printingWithKey");
 
-  // Render keys if needed (print will show/hide section)
-  renderTo("key1", CURRENT.puzzles[0], true);
-  renderTo("key2", CURRENT.puzzles[1], true);
+  // Render current state
+  rerender();
 
-  // Critical for iOS print: remove inline scale sizing (transform breaks flow)
+  // iOS print fix: remove inline scaling so print CSS can lay out in normal flow
   clearSizerInline("worksheet1");
   clearSizerInline("worksheet2");
   clearSizerInline("key1");
   clearSizerInline("key2");
-
-  if (includeKey) {
-    document.body.classList.add("printingWithKey");
-  } else {
-    document.body.classList.remove("printingWithKey");
-  }
 }
 
 function printPuzzlesOnly() {
@@ -393,10 +362,10 @@ function printPuzzlesWithKey() {
   window.print();
 }
 
-// Best-effort cleanup after printing (not guaranteed on iOS; harmless if it fails)
+// Cleanup (best-effort)
 window.addEventListener("afterprint", () => {
   document.body.classList.remove("printingWithKey");
-  // Re-render to restore screen-fit scaling
+  // Restore scaling for screen
   rerender();
 });
 
@@ -404,12 +373,7 @@ function wireUI() {
   $("btnGenerate").addEventListener("click", generate);
   $("btnPrint").addEventListener("click", printPuzzlesOnly);
   $("btnPrintKey").addEventListener("click", printPuzzlesWithKey);
-
-  $("showAnswers").addEventListener("change", () => {
-    rerender();
-  });
+  $("showAnswers").addEventListener("change", rerender);
 }
 
 wireUI();
-// Optionally generate once on load:
-// generate();
