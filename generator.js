@@ -2,24 +2,11 @@
 
 const CURRENT = { puzzles: [] };
 
-/**
- * We will NOT assume op/value from layout index parity.
- * Instead, we compute a cellType list for the layout:
- * - index 0: "start" (value shown)
- * - then repeat: "op", "value", "op", "value", ...
- * BUT if layout length is even and would end on "op", we still allow it:
- *   - we just stop generating on the last value cell in the path.
- *   - the last visible answer cell is the last "value" cell.
- *
- * Also: we always show the final answer in the last VALUE cell,
- * not necessarily the last layout cell.
- */
+function $(id) { return document.getElementById(id); }
+function setStatus(msg) { $("status").textContent = msg || ""; }
+function readChecked(id) { return !!($(id) && $(id).checked); }
 
-function $(id){ return document.getElementById(id); }
-function setStatus(msg){ $("status").textContent = msg || ""; }
-function readChecked(id){ return !!($(id) && $(id).checked); }
-
-function readIntOrNull(id){
+function readIntOrNull(id) {
   const el = $(id);
   const raw = (el?.value ?? "").toString().trim();
   if (raw === "") return null;
@@ -27,7 +14,7 @@ function readIntOrNull(id){
   return Number.isFinite(n) ? n : null;
 }
 
-function readRequiredInt(id, minValue){
+function readRequiredInt(id, minValue) {
   const el = $(id);
   const raw = (el?.value ?? "").toString().trim();
   if (raw === "") return null;
@@ -38,19 +25,21 @@ function readRequiredInt(id, minValue){
   return f;
 }
 
-function randInt(minIncl, maxIncl){
+function randInt(minIncl, maxIncl) {
   return Math.floor(Math.random() * (maxIncl - minIncl + 1)) + minIncl;
 }
 
-function pickOne(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+function pickOne(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
-function withinBounds(x, minB, maxB){
+function withinBounds(x, minB, maxB) {
   if (minB != null && x < minB) return false;
   if (maxB != null && x > maxB) return false;
   return true;
 }
 
-function getAllowedKinds(){
+function getAllowedKinds() {
   const kinds = [];
   if (readChecked("allowAdd")) kinds.push("add");
   if (readChecked("allowSub")) kinds.push("sub");
@@ -59,9 +48,18 @@ function getAllowedKinds(){
   return kinds;
 }
 
-function formatOp(op){
+function effectiveKinds(allowed, maxAddSub, maxMul, maxDiv) {
+  return allowed.filter(k => {
+    if ((k === "add" || k === "sub") && maxAddSub == null) return false;
+    if (k === "mul" && maxMul == null) return false;
+    if (k === "div" && maxDiv == null) return false;
+    return true;
+  });
+}
+
+function formatOp(op) {
   if (!op) return "";
-  switch(op.kind){
+  switch (op.kind) {
     case "add": return `+${op.n}`;
     case "sub": return `-${op.n}`;
     case "mul": return `×${op.n}`;
@@ -70,8 +68,8 @@ function formatOp(op){
   }
 }
 
-function applyOp(v, op){
-  switch(op.kind){
+function applyOp(v, op) {
+  switch (op.kind) {
     case "add": return v + op.n;
     case "sub": return v - op.n;
     case "mul": return v * op.n;
@@ -81,62 +79,46 @@ function applyOp(v, op){
 }
 
 /**
- * Build a type map for each position in the layout.
- * index 0 is a VALUE.
- * Then alternate OP/VALUE for as long as possible.
- * If layout ends on OP, that's fine — we just won't show a final answer there.
+ * Cell types: index 0 is value, then alternate op/value.
+ * We do NOT require the layout to end on a value.
  */
-function buildCellTypes(layoutLength){
-  const types = new Array(layoutLength).fill("empty");
-  types[0] = "value"; // start value shown
-
-  let expect = "op";
-  for (let i = 1; i < layoutLength; i++){
-    types[i] = expect;
-    expect = (expect === "op") ? "value" : "op";
+function buildCellTypes(len) {
+  const types = new Array(len);
+  types[0] = "value";
+  let next = "op";
+  for (let i = 1; i < len; i++) {
+    types[i] = next;
+    next = (next === "op") ? "value" : "op";
   }
   return types;
 }
 
 /**
- * Find the last index in the layout that is a VALUE cell.
+ * Last participating value cell (we will render up to this).
+ * Any trailing cell after this is dropped from rendering entirely.
  */
-function lastValueIndex(cellTypes){
-  for (let i = cellTypes.length - 1; i >= 0; i--){
-    if (cellTypes[i] === "value") return i;
+function lastValueIndex(types) {
+  for (let i = types.length - 1; i >= 0; i--) {
+    if (types[i] === "value") return i;
   }
   return 0;
 }
 
-/**
- * Derive grid size from layout coords.
- */
-function getDims(layout){
+function getDimsFromLayout(layout) {
   const cols = Math.max(...layout.map(p => p[0] + 1));
   const rows = Math.max(...layout.map(p => p[1] + 1));
   return { cols, rows };
 }
 
-function effectiveKinds(allowed, maxAddSub, maxMul, maxDiv){
-  return allowed.filter(k => {
-    if ((k === "add" || k === "sub") && maxAddSub == null) return false;
-    if (k === "mul" && maxMul == null) return false;
-    if (k === "div" && maxDiv == null) return false;
-    return true;
-  });
-}
-
 /**
- * Generate a puzzle consistent with the cellTypes.
- * We only need ops for "op" cells that occur BEFORE the last value cell.
+ * Generate using the trimmed layout: layout.slice(0, lastValueIdx+1)
+ * This automatically removes the trailing last cell (your "extra square").
  */
-function generatePuzzle(layoutName="snake1"){
-  const layout = layouts[layoutName];
-  if (!layout || !Array.isArray(layout) || layout.length < 3){
+function generatePuzzle(layoutName = "snake1") {
+  const fullLayout = layouts[layoutName];
+  if (!fullLayout || !Array.isArray(fullLayout) || fullLayout.length < 3) {
     throw new Error(`Missing/invalid layout: ${layoutName}`);
   }
-
-  const { cols, rows } = getDims(layout);
 
   const minB = readIntOrNull("minBound");
   const maxB = readIntOrNull("maxBound");
@@ -156,19 +138,25 @@ function generatePuzzle(layoutName="snake1"){
   const kinds = effectiveKinds(allowed, maxAddSub, maxMul, maxDiv);
   if (!kinds.length) throw new Error("No operations are usable (checked + max values).");
 
-  const cellTypes = buildCellTypes(layout.length);
-  const lastValIdx = lastValueIndex(cellTypes);
+  // Build types based on full layout, then trim so we always end on a value cell.
+  const cellTypesFull = buildCellTypes(fullLayout.length);
+  const lastValIdxFull = lastValueIndex(cellTypesFull);
 
-  // We only generate through lastValIdx (inclusive). Anything after is ignored visually.
-  const MAX_RESTARTS = 400;
+  const layout = fullLayout.slice(0, lastValIdxFull + 1);
+  const cellTypes = cellTypesFull.slice(0, lastValIdxFull + 1);
+  const lastValIdx = lastValIdxFull; // now the last index of 'layout' is a value cell
 
-  for (let attempt = 0; attempt < MAX_RESTARTS; attempt++){
-    const valuesByIndex = {}; // for indices where type=value
-    const opsByIndex = {};    // for indices where type=op (before lastValIdx)
+  const { cols, rows } = getDimsFromLayout(layout);
 
-    // pick start
+  const MAX_RESTARTS = 450;
+
+  for (let attempt = 0; attempt < MAX_RESTARTS; attempt++) {
+    const valuesByIndex = {}; // indices where cellTypes[idx] === "value"
+    const opsByIndex = {};    // indices where cellTypes[idx] === "op"
+
+    // Start value choice
     let start;
-    if (minB != null || maxB != null){
+    if (minB != null || maxB != null) {
       const lo = (minB != null) ? minB : -20;
       const hi = (maxB != null) ? maxB : 20;
       start = randInt(lo, hi);
@@ -180,40 +168,33 @@ function generatePuzzle(layoutName="snake1"){
 
     let ok = true;
 
-    // Walk indices up to lastValIdx
-    for (let i = 1; i <= lastValIdx; i++){
+    for (let i = 1; i <= lastValIdx; i++) {
       const t = cellTypes[i];
 
-      if (t === "op"){
-        // choose an op now; validate next value when we compute it
+      if (t === "op") {
+        // choose op
         const kind = pickOne(kinds);
         let op;
-
         if (kind === "add") op = { kind, n: randInt(1, maxAddSub) };
         else if (kind === "sub") op = { kind, n: randInt(1, maxAddSub) };
         else if (kind === "mul") op = { kind, n: randInt(2, maxMul) };
         else op = { kind, n: randInt(2, maxDiv) };
 
         opsByIndex[i] = op;
-      } else if (t === "value"){
-        // compute this value from previous value and previous op
-        // find previous value index (i-2 under our alternating pattern)
+      } else {
+        // value cell: compute from prev value + prev op
         const prevValIdx = i - 2;
         const opIdx = i - 1;
 
         const prevVal = valuesByIndex[prevValIdx];
         const op = opsByIndex[opIdx];
-        if (prevVal == null || !op){
-          ok = false; break;
-        }
+
+        if (prevVal == null || !op) { ok = false; break; }
 
         let next = applyOp(prevVal, op);
-        if (op.kind === "div" && !Number.isInteger(next)){
-          ok = false; break;
-        }
-        if (!withinBounds(next, minB, maxB)){
-          ok = false; break;
-        }
+
+        if (op.kind === "div" && !Number.isInteger(next)) { ok = false; break; }
+        if (!withinBounds(next, minB, maxB)) { ok = false; break; }
 
         valuesByIndex[i] = next;
       }
@@ -221,15 +202,24 @@ function generatePuzzle(layoutName="snake1"){
 
     if (!ok) continue;
 
-    return { layoutName, layout, cols, rows, cellTypes, lastValIdx, valuesByIndex, opsByIndex };
+    return {
+      layoutName,
+      layout,         // TRIMMED layout (extra end cell removed)
+      cols,
+      rows,
+      cellTypes,
+      lastValIdx,
+      valuesByIndex,
+      opsByIndex
+    };
   }
 
   throw new Error("Could not generate a puzzle with those constraints. Loosen bounds or reduce Multiply/Divide.");
 }
 
-/* ===== Rendering + scaling ===== */
+/* ===== rendering + scaling ===== */
 
-function ensureSizer(gridEl){
+function ensureSizer(gridEl) {
   const parent = gridEl.parentElement;
   if (parent && parent.classList && parent.classList.contains("worksheetSizer")) return parent;
 
@@ -240,7 +230,7 @@ function ensureSizer(gridEl){
   return sizer;
 }
 
-function measurePuzzlePixelSize(cols, rows){
+function measurePuzzlePixelSize(cols, rows) {
   const cs = getComputedStyle(document.documentElement);
   const cellW = parseFloat(cs.getPropertyValue("--cell-w")) || 100;
   const cellH = parseFloat(cs.getPropertyValue("--cell-h")) || 80;
@@ -252,17 +242,17 @@ function measurePuzzlePixelSize(cols, rows){
   };
 }
 
-function renderTo(targetId, puzzle, showAnswers){
+function renderTo(targetId, puzzle, showAnswers) {
   const grid = $(targetId);
   if (!grid) return;
 
   grid.innerHTML = "";
   grid.style.setProperty("--cols", puzzle.cols);
 
-  // We will still render ALL layout squares, but:
-  // - only value cells up to lastValIdx participate
-  // - if layout ends on op, that op just displays, but isn't the "final answer"
-  puzzle.layout.forEach((pos, idx) => {
+  // Only render indices that exist in trimmed layout
+  for (let idx = 0; idx < puzzle.layout.length; idx++) {
+    const pos = puzzle.layout[idx];
+
     const cell = document.createElement("div");
     cell.className = "cell";
     cell.style.gridColumn = (pos[0] + 1);
@@ -270,41 +260,38 @@ function renderTo(targetId, puzzle, showAnswers){
 
     const t = puzzle.cellTypes[idx];
 
-    if (idx === 0){
+    if (idx === 0) {
       cell.textContent = String(puzzle.valuesByIndex[0]);
-    } else if (t === "op" && idx <= puzzle.lastValIdx){
+    } else if (t === "op") {
       const op = puzzle.opsByIndex[idx];
       cell.textContent = formatOp(op);
       cell.classList.add("op");
-    } else if (t === "value" && idx <= puzzle.lastValIdx){
+    } else {
+      // value
       const val = puzzle.valuesByIndex[idx];
-      const isFinalValueCell = (idx === puzzle.lastValIdx);
+      const isFinal = (idx === puzzle.lastValIdx);
 
-      if (isFinalValueCell){
-        cell.textContent = String(val); // always show final answer
-      } else if (showAnswers){
+      if (isFinal) {
+        cell.textContent = String(val); // final answer always shown
+      } else if (showAnswers) {
         cell.textContent = String(val);
       } else {
         cell.textContent = "";
         cell.classList.add("blank");
       }
-    } else {
-      // indices beyond lastValIdx: make them look like blanks (or empty)
-      // This keeps your shape without forcing the model to use the tail.
-      cell.textContent = "";
-      cell.classList.add("blank");
     }
 
     grid.appendChild(cell);
-  });
+  }
 
-  // screen-fit scaling only
+  // Screen-fit scaling only
   const sizer = ensureSizer(grid);
+
   const { width, height } = measurePuzzlePixelSize(puzzle.cols, puzzle.rows);
 
   const puzzleCard = sizer.closest(".puzzleCard");
   let avail = 0;
-  if (puzzleCard){
+  if (puzzleCard) {
     const rect = puzzleCard.getBoundingClientRect();
     const style = getComputedStyle(puzzleCard);
     const padL = parseFloat(style.paddingLeft) || 0;
@@ -322,7 +309,7 @@ function renderTo(targetId, puzzle, showAnswers){
   sizer.style.height = `${height}px`;
 }
 
-function clearSizerInline(targetId){
+function clearSizerInline(targetId) {
   const grid = $(targetId);
   if (!grid) return;
   const sizer = grid.parentElement;
@@ -336,47 +323,48 @@ function clearSizerInline(targetId){
   sizer.style.removeProperty("--grid-h");
 }
 
-/* ===== App actions ===== */
+/* ===== app actions ===== */
 
-function rerender(){
+function rerender() {
   if (CURRENT.puzzles.length !== 2) return;
+
   const show = readChecked("showAnswers");
 
   renderTo("worksheet1", CURRENT.puzzles[0], show);
   renderTo("worksheet2", CURRENT.puzzles[1], show);
 
-  // always keep keys rendered for print
+  // answer keys always rendered; print toggles visibility
   renderTo("key1", CURRENT.puzzles[0], true);
   renderTo("key2", CURRENT.puzzles[1], true);
 }
 
-function generate(){
-  try{
+function generate() {
+  try {
     setStatus("");
     const p1 = generatePuzzle("snake1");
-    const p2 = generatePuzzle("snake1");
+    const p2 = generatePuzzle("snake1"); // or "snake2" if you want a different shape
     CURRENT.puzzles = [p1, p2];
     rerender();
-  } catch(e){
+  } catch (e) {
     setStatus(e.message || String(e));
   }
 }
 
-function prepareForPrint(includeKey){
+function prepareForPrint(includeKey) {
   if (includeKey) document.body.classList.add("printingWithKey");
   else document.body.classList.remove("printingWithKey");
 
   rerender();
 
-  // iOS print fix: remove inline scaling so print CSS normal flow works
+  // iOS print fix: no transform scaling during print flow
   clearSizerInline("worksheet1");
   clearSizerInline("worksheet2");
   clearSizerInline("key1");
   clearSizerInline("key2");
 }
 
-function printPuzzlesOnly(){
-  if (CURRENT.puzzles.length !== 2){
+function printPuzzlesOnly() {
+  if (CURRENT.puzzles.length !== 2) {
     setStatus("No puzzles yet. Click Generate Puzzles first.");
     return;
   }
@@ -385,8 +373,8 @@ function printPuzzlesOnly(){
   window.print();
 }
 
-function printPuzzlesWithKey(){
-  if (CURRENT.puzzles.length !== 2){
+function printPuzzlesWithKey() {
+  if (CURRENT.puzzles.length !== 2) {
     setStatus("No puzzles yet. Click Generate Puzzles first.");
     return;
   }
@@ -400,7 +388,7 @@ window.addEventListener("afterprint", () => {
   rerender();
 });
 
-function wireUI(){
+function wireUI() {
   $("btnGenerate").addEventListener("click", generate);
   $("btnPrint").addEventListener("click", printPuzzlesOnly);
   $("btnPrintKey").addEventListener("click", printPuzzlesWithKey);
