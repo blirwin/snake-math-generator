@@ -14,7 +14,6 @@ function setStatus(msg) {
 }
 
 function readNumber(id) {
-  // Works for <input type="number">: returns number or NaN when blank/invalid
   return mustGetEl(id).valueAsNumber
 }
 
@@ -23,8 +22,6 @@ function readChecked(id) {
 }
 
 function normalizeLayout(rawLayout) {
-  // Layout indices map to: 0=start, odd=op, even=blank
-  // => length must be odd so it ends on a blank.
   if (!Array.isArray(rawLayout) || rawLayout.length < 3) {
     throw new Error("Layout missing or too short.")
   }
@@ -68,7 +65,6 @@ function applyOp(current, op) {
 // ==============================
 
 function readConstraints() {
-  // Bounds: blank => infinite
   let MIN = readNumber("minBound")
   let MAX = readNumber("maxBound")
   if (Number.isNaN(MIN)) MIN = -Infinity
@@ -80,16 +76,14 @@ function readConstraints() {
   const allowMul = readChecked("allowMul")
   const allowDiv = readChecked("allowDiv")
 
-  // Split maxima: NO DEFAULTS.
-  let maxAddSub = readNumber("maxAddSub") // must be >= 1 to use add/sub
-  let maxMul = readNumber("maxMul")       // must be >= 2 to use mul
-  let maxDiv = readNumber("maxDiv")       // must be >= 2 to use div
+  let maxAddSub = readNumber("maxAddSub")
+  let maxMul = readNumber("maxMul")
+  let maxDiv = readNumber("maxDiv")
 
   maxAddSub = Number.isNaN(maxAddSub) ? null : Math.floor(maxAddSub)
   maxMul = Number.isNaN(maxMul) ? null : Math.floor(maxMul)
   maxDiv = Number.isNaN(maxDiv) ? null : Math.floor(maxDiv)
 
-  // Validate and build allowed types with their limits
   const allowed = []
 
   if (allowAdd) {
@@ -137,7 +131,6 @@ function generateOpForCurrent(current, allowedSpecs, MIN, MAX) {
     }
 
     if (type === "mul") {
-      // pick factor 2..maxN but only if it keeps next in bounds
       const candidates = []
       for (let f = 2; f <= maxN; f++) {
         const next = current * f
@@ -145,12 +138,10 @@ function generateOpForCurrent(current, allowedSpecs, MIN, MAX) {
       }
       if (!candidates.length) continue
       const n = pickRandom(candidates)
-      const op = { type, n }
-      return { op, next: current * n }
+      return { op: { type, n }, next: current * n }
     }
 
     if (type === "div") {
-      // pick divisor 2..maxN that divides evenly and stays in bounds
       const candidates = []
       for (let d = 2; d <= maxN; d++) {
         if (current % d !== 0) continue
@@ -160,8 +151,7 @@ function generateOpForCurrent(current, allowedSpecs, MIN, MAX) {
       }
       if (!candidates.length) continue
       const n = pickRandom(candidates)
-      const op = { type, n }
-      return { op, next: current / n }
+      return { op: { type, n }, next: current / n }
     }
   }
 
@@ -186,12 +176,10 @@ function generate() {
 
   const { MIN, MAX, allowed } = constraints
 
-  // Start value selection
   let start
   if (Number.isFinite(MIN) && Number.isFinite(MAX)) {
     start = randomIntInclusive(MIN, MAX)
   } else {
-    // if user leaves bounds open-ended, keep start reasonable
     start = randomIntInclusive(1, 10)
     if (start < MIN) start = MIN
     if (start > MAX) start = MAX
@@ -214,7 +202,10 @@ function generate() {
   }
 
   validateSnake(values, ops)
-  render(layout, values, ops)
+
+  // NEW: pass showAnswers flag into render
+  const showAnswers = readChecked("showAnswers")
+  render(layout, values, ops, showAnswers)
 }
 
 // ==============================
@@ -237,10 +228,12 @@ function validateSnake(values, ops) {
 }
 
 // ==============================
-// Rendering (final blank shows answer only)
+// Rendering
+// - If showAnswers = false: only final blank shows answer
+// - If showAnswers = true: ALL blanks show answers (answer key mode)
 // ==============================
 
-function render(layout, values, ops) {
+function render(layout, values, ops, showAnswers) {
   const grid = mustGetEl("worksheet")
   grid.innerHTML = ""
 
@@ -260,7 +253,15 @@ function render(layout, values, ops) {
       cell.classList.add("op")
     } else {
       cell.classList.add("blank")
-      cell.innerText = (i === lastIndex) ? String(values[values.length - 1]) : ""
+
+      if (showAnswers) {
+        // Blank indices 2,4,6... correspond to values[1], values[2], values[3]...
+        const answerIndex = i / 2
+        cell.innerText = String(values[answerIndex])
+      } else {
+        // Self-check only
+        cell.innerText = (i === lastIndex) ? String(values[values.length - 1]) : ""
+      }
     }
 
     grid.appendChild(cell)
