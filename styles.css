@@ -24,9 +24,10 @@ html, body{
 
 /* ========== Layout ========== */
 .page{
-  max-width: 1080px;
+  /* slightly narrower + more side padding */
+  max-width: 980px;
   margin: 0 auto;
-  padding: 28px 22px 40px;
+  padding: 28px 36px 40px;
 }
 
 .header{
@@ -49,7 +50,7 @@ html, body{
   margin: 0;
 }
 
-/* ========== Controls Card ========== */
+/* ========== Cards ========== */
 .card{
   background: var(--card);
   border: 1px solid var(--border);
@@ -58,6 +59,7 @@ html, body{
   padding: 16px;
 }
 
+/* ========== Controls ========== */
 .controls{
   display: grid;
   grid-template-columns: 1.2fr 1.2fr 1.6fr;
@@ -183,7 +185,8 @@ html, body{
 
 /* ========== Worksheet Area ========== */
 .workspace{
-  margin-top: 18px;
+  /* slightly more separation from controls */
+  margin-top: 26px;
 }
 
 .sheet{
@@ -194,8 +197,7 @@ html, body{
   padding: 18px;
 }
 
-/* Your #worksheet is a CSS grid already in your setup.
-   Keep it flexible and centered. */
+/* Your puzzle grid */
 #worksheet{
   display: grid;
   gap: 16px;
@@ -204,31 +206,26 @@ html, body{
 
 /* ========== Cells ========== */
 .cell{
-  width: 112px;
-  height: 92px;
+  /* slightly smaller puzzle */
+  width: 102px;
+  height: 82px;
   border: 3px solid #111827;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
   background: #fff;
 }
 
-/* Operation cells */
 .cell.op{
   background: #e5e7eb;
+  letter-spacing: 0.01em;
 }
 
-/* Blank cells */
 .cell.blank{
   background: #fff;
-}
-
-/* Make × and ÷ read cleanly */
-.cell.op{
-  letter-spacing: 0.01em;
 }
 
 /* ========== Responsive ========== */
@@ -243,22 +240,54 @@ html, body{
     align-items: flex-start;
   }
   .cell{
-    width: 100px;
-    height: 84px;
-    font-size: 26px;
+    width: 96px;
+    height: 78px;
+    font-size: 25px;
+  }
+  #worksheet{
+    gap: 14px;
   }
 }
 
 /* ========== Print ========== */
 @media print{
   :root{ --bg: #ffffff; --shadow: none; }
+
   body{ background: #fff; }
-  .page{ padding: 0; max-width: none; }
-  .card, .sheet{ box-shadow: none; border: none; padding: 0; }
-  .controlsCard{ display: none; } /* Hide controls in print */
-  .header{ margin: 0 0 10px 0; }
-  .header h1{ font-size: 26px; }
-  #worksheet{ gap: 12px; }
+
+  .page{
+    padding: 0;
+    max-width: none;
+    margin: 0;
+  }
+
+  .card, .sheet{
+    box-shadow: none;
+    border: none;
+    padding: 0;
+  }
+
+  .controlsCard{
+    display: none;
+  }
+
+  .header{
+    margin: 0 0 10px 0;
+  }
+
+  .header h1{
+    font-size: 26px;
+  }
+
+  /* Push puzzle slightly lower on printed page */
+  .sheet{
+    margin-top: 40px;
+  }
+
+  #worksheet{
+    gap: 12px;
+  }
+
   .cell{
     width: 90px;
     height: 72px;
