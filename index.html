@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Snake Worksheet Generator</title>
-  <link rel="stylesheet" href="./styles.css?v=9" />
+  <link rel="stylesheet" href="./styles.css?v=10" />
 </head>
 
 <body>
@@ -15,40 +15,48 @@
     </div>
 
     <div class="card controlsCard">
-      <!-- Inputs -->
-      <div class="inputGrid">
-        <div class="field">
-          <div class="label">Min Bound</div>
-          <input id="minBound" class="input" type="number" placeholder="(blank = no min)" />
+
+      <!-- How it works: ABOVE inputs -->
+      <div class="callout">
+        <div class="calloutTitle">How it works</div>
+        <div class="calloutText">
+          If you check an operation, you must enter its max (Add/Sub ≥ 1; Multiply/Divide ≥ 2).
+        </div>
+      </div>
+
+      <!-- Compact inputs -->
+      <div class="inputPanel">
+        <div class="inputRow">
+          <div class="fieldInline">
+            <label class="labelInline" for="minBound">Min Bound</label>
+            <input id="minBound" class="inputSmall" type="number" placeholder="—" />
+            <span class="miniHint">(blank = no min)</span>
+          </div>
+
+          <div class="fieldInline">
+            <label class="labelInline" for="maxBound">Max Bound</label>
+            <input id="maxBound" class="inputSmall" type="number" placeholder="—" />
+            <span class="miniHint">(blank = no max)</span>
+          </div>
         </div>
 
-        <div class="field">
-          <div class="label">Max Bound</div>
-          <input id="maxBound" class="input" type="number" placeholder="(blank = no max)" />
-        </div>
+        <div class="inputRow">
+          <div class="fieldInline">
+            <label class="labelInline" for="maxAddSub">Max Add/Sub</label>
+            <input id="maxAddSub" class="inputSmall" type="number" min="1" step="1" value="10" />
+            <span class="miniHint">(+ / − amount)</span>
+          </div>
 
-        <div class="field">
-          <div class="label">Max Add/Sub Amount</div>
-          <input id="maxAddSub" class="input" type="number" min="1" step="1" value="10" />
-          <div class="hint">Used for + and − steps.</div>
-        </div>
+          <div class="fieldInline">
+            <label class="labelInline" for="maxMul">Max Multiply</label>
+            <input id="maxMul" class="inputSmall" type="number" min="2" step="1" value="10" />
+            <span class="miniHint">(× factor)</span>
+          </div>
 
-        <div class="field">
-          <div class="label">Max Multiply Factor</div>
-          <input id="maxMul" class="input" type="number" min="2" step="1" value="10" />
-          <div class="hint">Used for × factors (2+).</div>
-        </div>
-
-        <div class="field">
-          <div class="label">Max Divide Divisor</div>
-          <input id="maxDiv" class="input" type="number" min="2" step="1" value="10" />
-          <div class="hint">Used for ÷ divisors (2+).</div>
-        </div>
-
-        <div class="field howItWorks">
-          <div class="label">How it works</div>
-          <div class="hint">
-            If you check an operation, you must enter its max (Add/Sub ≥ 1; Multiply/Divide ≥ 2).
+          <div class="fieldInline">
+            <label class="labelInline" for="maxDiv">Max Divide</label>
+            <input id="maxDiv" class="inputSmall" type="number" min="2" step="1" value="10" />
+            <span class="miniHint">(÷ divisor)</span>
           </div>
         </div>
       </div>
@@ -91,7 +99,7 @@
         </label>
       </div>
 
-      <!-- Actions -->
+      <!-- Buttons -->
       <div class="buttonRow">
         <button class="btn primary" onclick="generate()">Generate Puzzles</button>
         <button class="btn" onclick="printWorksheet()">Print Puzzles</button>
