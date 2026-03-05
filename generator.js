@@ -190,38 +190,6 @@ function puzzlesEqual(a, b) {
   return true
 }
 
-function generate() {
-  setStatus("")
-
-  const layout = normalizeLayout(layouts.snake1)
-  const constraints = readConstraints()
-  if (constraints.error) {
-    setStatus(constraints.error)
-    return
-  }
-
-  const MAX_ATTEMPTS = 40
-  let p1 = null, p2 = null
-
-  for (let a = 0; a < MAX_ATTEMPTS && !p1; a++) p1 = generateOnePuzzle(layout, constraints)
-  if (!p1) {
-    setStatus("Could not generate Puzzle 1 with these constraints. Widen bounds or allow more operations.")
-    return
-  }
-
-  for (let a = 0; a < MAX_ATTEMPTS && !p2; a++) {
-    const candidate = generateOnePuzzle(layout, constraints)
-    if (candidate && !puzzlesEqual(candidate, p1)) p2 = candidate
-  }
-  if (!p2) {
-    setStatus("Could not generate a distinct Puzzle 2 with these constraints. Try widening bounds or loosening operation limits.")
-    return
-  }
-
-  CURRENT_PUZZLES = [p1, p2]
-  rerender()
-}
-
 function renderTo(containerId, puzzle, showAnswers) {
   const grid = mustGetEl(containerId)
   grid.innerHTML = ""
@@ -260,15 +228,50 @@ function rerender() {
     setStatus("No puzzles yet. Click Generate.")
     return
   }
+
   const showAnswers = readChecked("showAnswers")
   renderTo("worksheet1", CURRENT_PUZZLES[0], showAnswers)
   renderTo("worksheet2", CURRENT_PUZZLES[1], showAnswers)
 }
 
+function generate() {
+  setStatus("")
+
+  const layout = normalizeLayout(layouts.snake1)
+  const constraints = readConstraints()
+  if (constraints.error) {
+    setStatus(constraints.error)
+    return
+  }
+
+  const MAX_ATTEMPTS = 50
+  let p1 = null
+  let p2 = null
+
+  for (let a = 0; a < MAX_ATTEMPTS && !p1; a++) p1 = generateOnePuzzle(layout, constraints)
+  if (!p1) {
+    setStatus("Could not generate Puzzle 1 with these constraints. Widen bounds or allow more operations.")
+    return
+  }
+
+  for (let a = 0; a < MAX_ATTEMPTS && !p2; a++) {
+    const candidate = generateOnePuzzle(layout, constraints)
+    if (candidate && !puzzlesEqual(candidate, p1)) p2 = candidate
+  }
+  if (!p2) {
+    setStatus("Could not generate a distinct Puzzle 2 with these constraints. Try widening bounds or loosening operation limits.")
+    return
+  }
+
+  CURRENT_PUZZLES = [p1, p2]
+  rerender()
+}
+
 /**
- * Print behavior:
- * - Always prints student puzzles
- * - If "Answer key page" is checked, prints a second page with answers revealed
+ * Print:
+ * - Student puzzles always print.
+ * - Answer key prints on page 2 ONLY if checkbox is checked.
+ * Uses CSS @media print + a body class.
  */
 function printWorksheet() {
   if (!CURRENT_PUZZLES.length) {
@@ -276,13 +279,11 @@ function printWorksheet() {
     return
   }
 
-  const wantsKeyPage = readChecked("printKey")
+  const wantsKey = readChecked("printKey")
 
-  if (wantsKeyPage) {
-    // Render key pages with answers ALWAYS revealed (independent of showAnswers toggle)
+  if (wantsKey) {
     renderTo("key1", CURRENT_PUZZLES[0], true)
     renderTo("key2", CURRENT_PUZZLES[1], true)
-
     document.body.classList.add("printingWithKey")
   } else {
     document.body.classList.remove("printingWithKey")
@@ -290,9 +291,9 @@ function printWorksheet() {
 
   window.print()
 
-  // Cleanup: remove key mode so screen view stays normal
+  // Always clean up after printing so screen behavior stays sane
   document.body.classList.remove("printingWithKey")
 }
 
-// Auto-generate on load
+// auto-generate on load
 generate()
