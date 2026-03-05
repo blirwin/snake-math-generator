@@ -1,9 +1,8 @@
 // ==============================
-// Global state: current puzzle
+// Global state: two current puzzles
 // ==============================
 
-let CURRENT_PUZZLE = null
-// { layout, values, ops }
+let CURRENT_PUZZLES = [] // [{ layout, values, ops }, { layout, values, ops }]
 
 // ==============================
 // Helpers
@@ -164,21 +163,11 @@ function generateOpForCurrent(current, allowedSpecs, MIN, MAX) {
 }
 
 // ==============================
-// Generate puzzle data (no rendering here)
+// Generate ONE puzzle (data only)
 // ==============================
 
-function generate() {
-  setStatus("")
-
-  const layout = normalizeLayout(layouts.snake1)
+function generateOnePuzzle(layout, constraints) {
   const steps = (layout.length - 1) / 2
-
-  const constraints = readConstraints()
-  if (constraints.error) {
-    setStatus(constraints.error)
-    return
-  }
-
   const { MIN, MAX, allowed } = constraints
 
   let start
@@ -196,41 +185,87 @@ function generate() {
   for (let i = 0; i < steps; i++) {
     const current = values[i]
     const result = generateOpForCurrent(current, allowed, MIN, MAX)
-
-    if (!result) {
-      setStatus("Could not generate with these constraints. Widen bounds, reduce operation limits, or allow more operation types.")
-      return
-    }
-
+    if (!result) return null
     ops.push(result.op)
     values.push(result.next)
   }
 
-  validateSnake(values, ops)
+  if (!validateSnake(values, ops)) return null
+  return { layout, values, ops }
+}
 
-  // Store puzzle for later re-rendering
-  CURRENT_PUZZLE = { layout, values, ops }
+// Make sure puzzle2 is not identical to puzzle1 (rare, but possible)
+function puzzlesEqual(a, b) {
+  if (!a || !b) return false
+  if (a.values.length !== b.values.length) return false
+  for (let i = 0; i < a.values.length; i++) {
+    if (a.values[i] !== b.values[i]) return false
+  }
+  for (let i = 0; i < a.ops.length; i++) {
+    if (a.ops[i].type !== b.ops[i].type || a.ops[i].n !== b.ops[i].n) return false
+  }
+  return true
+}
 
-  // Render using current showAnswers toggle
+// ==============================
+// Generate TWO puzzles
+// ==============================
+
+function generate() {
+  setStatus("")
+
+  const layout = normalizeLayout(layouts.snake1)
+  const constraints = readConstraints()
+  if (constraints.error) {
+    setStatus(constraints.error)
+    return
+  }
+
+  // Try a few times to get two distinct puzzles under tight constraints
+  const MAX_ATTEMPTS = 40
+
+  let p1 = null
+  let p2 = null
+
+  for (let a = 0; a < MAX_ATTEMPTS && !p1; a++) {
+    p1 = generateOnePuzzle(layout, constraints)
+  }
+  if (!p1) {
+    setStatus("Could not generate Puzzle 1 with these constraints. Widen bounds or allow more operations.")
+    return
+  }
+
+  for (let a = 0; a < MAX_ATTEMPTS && !p2; a++) {
+    const candidate = generateOnePuzzle(layout, constraints)
+    if (candidate && !puzzlesEqual(candidate, p1)) p2 = candidate
+  }
+  if (!p2) {
+    setStatus("Could not generate a distinct Puzzle 2 with these constraints. Try widening bounds or loosening operation limits.")
+    return
+  }
+
+  CURRENT_PUZZLES = [p1, p2]
   rerender()
 }
 
 // ==============================
-// Rerender existing puzzle (no regeneration)
+// Rerender without regenerating
 // ==============================
 
 function rerender() {
-  if (!CURRENT_PUZZLE) {
-    setStatus("No puzzle yet. Click Generate.")
+  if (!CURRENT_PUZZLES.length) {
+    setStatus("No puzzles yet. Click Generate.")
     return
   }
-  setStatus("")
+
   const showAnswers = readChecked("showAnswers")
-  render(CURRENT_PUZZLE.layout, CURRENT_PUZZLE.values, CURRENT_PUZZLE.ops, showAnswers)
+
+  renderTo("worksheet1", CURRENT_PUZZLES[0], showAnswers)
+  renderTo("worksheet2", CURRENT_PUZZLES[1], showAnswers)
 }
 
 // ==============================
-// Validation (debug)
+// Validation
 // ==============================
 
 function validateSnake(values, ops) {
@@ -252,10 +287,11 @@ function validateSnake(values, ops) {
 // Rendering
 // ==============================
 
-function render(layout, values, ops, showAnswers) {
-  const grid = mustGetEl("worksheet")
+function renderTo(containerId, puzzle, showAnswers) {
+  const grid = mustGetEl(containerId)
   grid.innerHTML = ""
 
+  const { layout, values, ops } = puzzle
   const lastIndex = layout.length - 1
 
   layout.forEach((pos, i) => {
@@ -272,9 +308,8 @@ function render(layout, values, ops, showAnswers) {
       cell.classList.add("op")
     } else {
       cell.classList.add("blank")
-
       if (showAnswers) {
-        const answerIndex = i / 2 // blanks map to values[1..]
+        const answerIndex = i / 2
         cell.innerText = String(values[answerIndex])
       } else {
         cell.innerText = (i === lastIndex) ? String(values[values.length - 1]) : ""
