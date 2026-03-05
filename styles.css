@@ -8,14 +8,12 @@
   --shadow: 0 10px 25px rgba(0,0,0,0.06);
   --radius: 14px;
   --radius-sm: 10px;
+  --gap: 14px;
 
-  /* puzzle sizing */
+  /* base cell sizing (screen) */
   --cell-w: 102px;
   --cell-h: 82px;
   --cell-gap: 16px;
-
-  /* must be >= max column index in your layouts + 1 */
-  --grid-cols: 12;
 }
 
 *{ box-sizing: border-box; }
@@ -28,7 +26,6 @@ html, body{
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
 }
 
-/* Layout */
 .page{
   max-width: 980px;
   margin: 0 auto;
@@ -55,7 +52,6 @@ html, body{
   margin: 0;
 }
 
-/* Cards */
 .card{
   background: var(--card);
   border: 1px solid var(--border);
@@ -68,7 +64,7 @@ html, body{
 .controls{
   display: grid;
   grid-template-columns: 1.2fr 1.2fr 1.6fr;
-  gap: 14px;
+  gap: var(--gap);
   align-items: end;
 }
 
@@ -109,9 +105,10 @@ html, body{
   margin-top: 12px;
   display: grid;
   grid-template-columns: 1.2fr 1.2fr 1.2fr;
-  gap: 14px;
+  gap: var(--gap);
 }
 
+/* Row 1: ops + actions */
 .opsRow{
   margin-top: 14px;
   display: flex;
@@ -122,6 +119,26 @@ html, body{
 }
 
 .ops{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+
+.actions{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Row 2: answer controls */
+.answerRow{
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.answers{
   display: flex;
   flex-wrap: wrap;
   gap: 10px 16px;
@@ -144,12 +161,6 @@ html, body{
   font-size: 14px;
   font-weight: 600;
   color: #111827;
-}
-
-.actions{
-  display: flex;
-  gap: 10px;
-  align-items: center;
 }
 
 .btn{
@@ -211,27 +222,37 @@ html, body{
   padding-left: 2px;
 }
 
-/* Fix #1: never let puzzle grid break out of its card */
+/* Container never breaks out */
 .puzzleCard{
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px;
   background: #fff;
+
+  /* IMPORTANT: allow scaled content to be visible */
+  overflow: hidden;
 }
 
-/* Fix: stable grid sizing so implicit columns don't explode */
-.worksheet,
-#worksheet1,#worksheet2,#key1,#key2{
+/* This wrapper is what we scale */
+.worksheetSizer{
+  transform-origin: top left;
+  transform: scale(var(--scale, 1));
+  width: var(--grid-w, 0px);
+  height: var(--grid-h, 0px);
+}
+
+/* The visible grid */
+.worksheet{
   display: grid;
   gap: var(--cell-gap);
   justify-content: start;
 
   grid-auto-columns: var(--cell-w);
   grid-auto-rows: var(--cell-h);
-  grid-template-columns: repeat(var(--grid-cols), var(--cell-w));
+
+  /* cols/rows set per-puzzle by JS */
+  grid-template-columns: repeat(var(--cols, 12), var(--cell-w));
 }
 
 /* Cells */
@@ -251,10 +272,9 @@ html, body{
 .cell.op{ background: #e5e7eb; }
 .cell.blank{ background: #fff; }
 
-/* Answer key hidden on screen (always) */
+/* Answer key hidden on screen */
 .answerKeySection{ display: none; }
 
-/* Page break helper */
 .pageBreak{ display: block; }
 
 /* Responsive */
@@ -270,7 +290,6 @@ html, body{
     --bg: #ffffff;
     --shadow: none;
 
-    /* slightly tighter print sizing */
     --cell-w: 90px;
     --cell-h: 72px;
     --cell-gap: 12px;
@@ -292,12 +311,12 @@ html, body{
     padding: 0;
   }
 
-  .sheet{ margin-top: 28px; }
+  .sheet{ margin-top: 22px; }
 
   .puzzleCard{
-    overflow: visible; /* don't print scrollbars */
     border: none;
     padding: 0;
+    overflow: visible;
   }
 
   .cell{
@@ -305,15 +324,16 @@ html, body{
     font-size: 22px;
   }
 
-  /* Enforce page break before answer key */
   .pageBreak{
     break-before: page;
     page-break-before: always;
-  } /* :contentReference[oaicite:3]{index=3} */
+  }
 
-  /* Hide answer key by default in print */
   .answerKeySection{ display: none; }
+  body.printingWithKey .answerKeySection{ display: block; }
 
-  /* Show answer key ONLY if checkbox enabled (JS adds class) */
-  body.printingWithKey .answerKeySection{ display: block; } /* :contentReference[oaicite:4]{index=4} */
+  /* In print we generally want 1:1 scale (fit should already be fine with smaller cells) */
+  .worksheetSizer{
+    transform: scale(1);
+  }
 }
