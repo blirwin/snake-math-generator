@@ -6,10 +6,6 @@ function $(id) { return document.getElementById(id); }
 function setStatus(msg) { $("status").textContent = msg || ""; }
 function readChecked(id) { return !!($(id) && $(id).checked); }
 
-/**
- * Returns a number or null.
- * IMPORTANT: does NOT use `||` so 0 is preserved as a valid value.
- */
 function readNumberOrNull(id) {
   const el = $(id);
   const raw = (el?.value ?? "").toString().trim();
@@ -19,10 +15,6 @@ function readNumberOrNull(id) {
   return n;
 }
 
-/**
- * Returns an integer or null.
- * IMPORTANT: does NOT use `||` so 0 is preserved.
- */
 function readIntOrNull(id) {
   const n = readNumberOrNull(id);
   if (n == null) return null;
@@ -44,9 +36,6 @@ function pickOne(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/**
- * Bounds apply independently.
- */
 function withinBounds(x, minB, maxB) {
   if (minB != null && x < minB) return false;
   if (maxB != null && x > maxB) return false;
@@ -127,8 +116,43 @@ function makeOp(kind, maxAddSub, maxMul, maxDiv) {
 }
 
 /**
- * Key: trims layout so it ends on a VALUE cell (removes extra last square).
- * Also: enforces bounds on EVERY computed value regardless of min/max presence.
+ * True iff b is the immediate inverse of a (same magnitude, opposite operation).
+ * +k <-> -k, ×k <-> ÷k
+ */
+function isInverseOp(a, b) {
+  if (!a || !b) return false;
+  if (a.n !== b.n) return false;
+
+  return (
+    (a.kind === "add" && b.kind === "sub") ||
+    (a.kind === "sub" && b.kind === "add") ||
+    (a.kind === "mul" && b.kind === "div") ||
+    (a.kind === "div" && b.kind === "mul")
+  );
+}
+
+/**
+ * Choose a new op that is NOT the inverse of prevOp.
+ * We try several random draws; if it's impossible (constraints too tight),
+ * we fall back to any op to avoid infinite loops.
+ */
+function pickNonInverseOp(prevOp, kinds, maxAddSub, maxMul, maxDiv) {
+  const TRIES = 40;
+
+  for (let t = 0; t < TRIES; t++) {
+    const candidate = makeOp(pickOne(kinds), maxAddSub, maxMul, maxDiv);
+    if (!isInverseOp(prevOp, candidate)) return candidate;
+  }
+
+  // fallback (can happen if only one magnitude/op option exists)
+  return makeOp(pickOne(kinds), maxAddSub, maxMul, maxDiv);
+}
+
+/**
+ * Generates a puzzle and trims the layout so it ends on a VALUE cell,
+ * removing your "extra last square" without editing layouts.
+ *
+ * Also enforces: next op cannot be the inverse of the previous op.
  */
 function generatePuzzle(layoutName = "snake1") {
   const fullLayout = layouts[layoutName];
@@ -139,7 +163,6 @@ function generatePuzzle(layoutName = "snake1") {
   const minB = readIntOrNull("minBound");
   const maxB = readIntOrNull("maxBound");
 
-  // sanity (optional): if both present and min>max, refuse
   if (minB != null && maxB != null && minB > maxB) {
     throw new Error("Min Bound cannot be greater than Max Bound.");
   }
@@ -159,7 +182,7 @@ function generatePuzzle(layoutName = "snake1") {
   const kinds = effectiveKinds(allowed, maxAddSub, maxMul, maxDiv);
   if (!kinds.length) throw new Error("No operations are usable (checked + max values).");
 
-  // Trim layout so it ends on a VALUE cell
+  // trim layout to last value cell (removes trailing dangling cell)
   const typesFull = buildCellTypes(fullLayout.length);
   const lastValIdxFull = lastValueIndex(typesFull);
 
@@ -169,36 +192,32 @@ function generatePuzzle(layoutName = "snake1") {
 
   const { cols, rows } = getDimsFromLayout(layout);
 
-  const MAX_RESTARTS = 800;
+  const MAX_RESTARTS = 900;
 
   for (let attempt = 0; attempt < MAX_RESTARTS; attempt++) {
     const valuesByIndex = {};
     const opsByIndex = {};
 
-    // Choose a start value that respects bounds (whether min/max exist or not).
+    // choose start near bounds to reduce runaway
     let start;
-    if (minB != null && maxB != null) {
-      start = randInt(minB, maxB);
-    } else if (minB != null && maxB == null) {
-      // no max: pick a reasonable start near min to reduce runaway
-      start = minB + randInt(0, 12);
-    } else if (minB == null && maxB != null) {
-      // no min: pick a reasonable start near max to reduce runaway
-      start = maxB - randInt(0, 12);
-    } else {
-      start = randInt(0, 12);
-    }
+    if (minB != null && maxB != null) start = randInt(minB, maxB);
+    else if (minB != null && maxB == null) start = minB + randInt(0, 12);
+    else if (minB == null && maxB != null) start = maxB - randInt(0, 12);
+    else start = randInt(0, 12);
 
     if (!withinBounds(start, minB, maxB)) continue;
     valuesByIndex[0] = start;
 
     let ok = true;
+    let prevOp = null;
 
     for (let i = 1; i <= lastValIdx; i++) {
       const t = cellTypes[i];
 
       if (t === "op") {
-        opsByIndex[i] = makeOp(pickOne(kinds), maxAddSub, maxMul, maxDiv);
+        const op = pickNonInverseOp(prevOp, kinds, maxAddSub, maxMul, maxDiv);
+        opsByIndex[i] = op;
+        prevOp = op;
         continue;
       }
 
@@ -211,13 +230,9 @@ function generatePuzzle(layoutName = "snake1") {
 
       if (prevVal == null || !op) { ok = false; break; }
 
-      // compute candidate
       let next = applyOp(prevVal, op);
 
-      // division must be integer result
       if (op.kind === "div" && !Number.isInteger(next)) { ok = false; break; }
-
-      // *** THIS is the bound enforcement that must always apply ***
       if (!withinBounds(next, minB, maxB)) { ok = false; break; }
 
       valuesByIndex[i] = next;
@@ -298,7 +313,6 @@ function renderTo(targetId, puzzle, showAnswers) {
 
   // Screen-fit scaling only
   const sizer = ensureSizer(grid);
-
   const { width, height } = measurePuzzlePixelSize(puzzle.cols, puzzle.rows);
 
   const puzzleCard = sizer.closest(".puzzleCard");
@@ -353,7 +367,7 @@ function generate() {
   try {
     setStatus("");
     const p1 = generatePuzzle("snake1");
-    const p2 = generatePuzzle("snake2"); // use both shapes by default
+    const p2 = generatePuzzle("snake2");
     CURRENT.puzzles = [p1, p2];
     rerender();
   } catch (e) {
@@ -367,7 +381,7 @@ function prepareForPrint(includeKey) {
 
   rerender();
 
-  // iOS print: disable transforms by clearing inline scaling
+  // iOS print: clear transform scaling before printing
   clearSizerInline("worksheet1");
   clearSizerInline("worksheet2");
   clearSizerInline("key1");
