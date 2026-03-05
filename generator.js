@@ -109,7 +109,7 @@ function makeOp(kind, maxAddSub, maxMul, maxDiv) {
   if (kind === "add") return { kind, n: randInt(1, maxAddSub) };
   if (kind === "sub") return { kind, n: randInt(1, maxAddSub) };
   if (kind === "mul") return { kind, n: randInt(2, maxMul) };
-  return { kind, n: randInt(2, maxDiv) };
+  return { kind, n: randInt(2, maxDiv) }; // div
 }
 
 function isInverseOp(a, b) {
@@ -133,6 +133,9 @@ function pickNonInverseOp(prevOp, kinds, maxAddSub, maxMul, maxDiv) {
   return makeOp(pickOne(kinds), maxAddSub, maxMul, maxDiv);
 }
 
+/**
+ * Generates a puzzle and trims the last dangling cell (so you don't see the extra tail square).
+ */
 function generatePuzzle(layoutName = "snake1") {
   const fullLayout = layouts[layoutName];
   if (!fullLayout || !Array.isArray(fullLayout) || fullLayout.length < 3) {
@@ -161,7 +164,7 @@ function generatePuzzle(layoutName = "snake1") {
   const kinds = effectiveKinds(allowed, maxAddSub, maxMul, maxDiv);
   if (!kinds.length) throw new Error("No operations are usable (checked + max values).");
 
-  // Trim layout to last value cell (removes dangling last cell)
+  // Trim to last value cell so the puzzle doesn't end with an extra cell
   const typesFull = buildCellTypes(fullLayout.length);
   const lastValIdxFull = lastValueIndex(typesFull);
 
@@ -208,7 +211,6 @@ function generatePuzzle(layoutName = "snake1") {
       if (prevVal == null || !op) { ok = false; break; }
 
       let next = applyOp(prevVal, op);
-
       if (op.kind === "div" && !Number.isInteger(next)) { ok = false; break; }
       if (!withinBounds(next, minB, maxB)) { ok = false; break; }
 
@@ -268,13 +270,11 @@ function renderTo(targetId, puzzle, showAnswers) {
     if (idx === 0) {
       cell.textContent = String(puzzle.valuesByIndex[0]);
     } else if (t === "op") {
-      const op = puzzle.opsByIndex[idx];
-      cell.textContent = formatOp(op);
+      cell.textContent = formatOp(puzzle.opsByIndex[idx]);
       cell.classList.add("op");
     } else {
       const val = puzzle.valuesByIndex[idx];
       const isFinal = (idx === puzzle.lastValIdx);
-
       if (isFinal) cell.textContent = String(val);
       else if (showAnswers) cell.textContent = String(val);
       else { cell.textContent = ""; cell.classList.add("blank"); }
@@ -327,22 +327,19 @@ function rerender() {
   if (CURRENT.puzzles.length !== 2) return;
 
   const show = readChecked("showAnswers");
-
   renderTo("worksheet1", CURRENT.puzzles[0], show);
   renderTo("worksheet2", CURRENT.puzzles[1], show);
 
+  // keys always rendered (print toggles visibility)
   renderTo("key1", CURRENT.puzzles[0], true);
   renderTo("key2", CURRENT.puzzles[1], true);
 }
 
-/**
- * ✅ FIX: use snake1 for BOTH puzzles so Puzzle 2 is not smaller.
- */
 function generate() {
   try {
     setStatus("");
     const p1 = generatePuzzle("snake1");
-    const p2 = generatePuzzle("snake1"); // <-- was snake2, making it smaller
+    const p2 = generatePuzzle("snake1"); // keep same size
     CURRENT.puzzles = [p1, p2];
     rerender();
   } catch (e) {
@@ -350,17 +347,33 @@ function generate() {
   }
 }
 
-function prepareForPrint(includeKey) {
+/**
+ * iOS/WebKit-safe print: wait for the DOM/class change to actually apply
+ * before calling window.print().
+ */
+function printAfterLayoutSettles(includeKey) {
   if (includeKey) document.body.classList.add("printingWithKey");
   else document.body.classList.remove("printingWithKey");
 
   rerender();
 
-  // iOS print: clear transform scaling before printing
+  // iOS print overlap fix: clear screen scaling so print CSS can flow
   clearSizerInline("worksheet1");
   clearSizerInline("worksheet2");
   clearSizerInline("key1");
   clearSizerInline("key2");
+
+  // Force a reflow (so class/display changes are committed)
+  void document.body.offsetHeight;
+
+  // Wait 2 frames + a tiny timeout. This is the part that fixes iOS Chrome.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        window.print();
+      }, 120);
+    });
+  });
 }
 
 function printPuzzlesOnly() {
@@ -369,8 +382,7 @@ function printPuzzlesOnly() {
     return;
   }
   setStatus("");
-  prepareForPrint(false);
-  window.print();
+  printAfterLayoutSettles(false);
 }
 
 function printPuzzlesWithKey() {
@@ -379,10 +391,10 @@ function printPuzzlesWithKey() {
     return;
   }
   setStatus("");
-  prepareForPrint(true);
-  window.print();
+  printAfterLayoutSettles(true);
 }
 
+// Best-effort cleanup (afterprint is inconsistent on iOS, but harmless)
 window.addEventListener("afterprint", () => {
   document.body.classList.remove("printingWithKey");
   rerender();
