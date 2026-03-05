@@ -161,9 +161,7 @@ html, body{
   cursor: pointer;
 }
 
-.btn:hover{
-  background: #f3f4f6;
-}
+.btn:hover{ background: #f3f4f6; }
 
 .btn.primary{
   background: #111827;
@@ -171,9 +169,7 @@ html, body{
   border-color: #111827;
 }
 
-.btn.primary:hover{
-  background: #0b1220;
-}
+.btn.primary:hover{ background: #0b1220; }
 
 .status{
   margin-top: 10px;
@@ -195,11 +191,11 @@ html, body{
   padding: 18px;
 }
 
-/* Titles above each puzzle */
+/* Stack titles vertically to match stacked puzzles */
 .sheetHeader{
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: 1fr;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
@@ -211,11 +207,11 @@ html, body{
   letter-spacing: 0.08em;
 }
 
-/* Two puzzles side-by-side */
+/* IMPORTANT: stack puzzles (Puzzle 1 then Puzzle 2) */
 .twoUp{
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: 1fr; /* <— single column */
+  gap: 22px;
   align-items: start;
 }
 
@@ -226,7 +222,7 @@ html, body{
   background: #fff;
 }
 
-/* IMPORTANT: each puzzle container MUST be a grid container */
+/* Each puzzle container MUST be a grid container */
 .worksheet,
 #worksheet1,
 #worksheet2{
@@ -264,8 +260,6 @@ html, body{
   .limits{ grid-template-columns: 1fr; }
   .opsRow{ align-items: flex-start; }
 
-  .twoUp{ grid-template-columns: 1fr; }
-
   .cell{
     width: 96px;
     height: 78px;
@@ -298,9 +292,14 @@ html, body{
   .header h1{ font-size: 26px; }
 
   /* push puzzles slightly lower on printed page */
-  .sheet{ margin-top: 40px; }
+  .sheet{ margin-top: 28px; }
 
-  .twoUp{ gap: 14px; }
+  /* ensure stacked in print too */
+  .twoUp{
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
   .puzzleCard{ border: none; padding: 0; }
 
   .worksheet{ gap: 12px; }
