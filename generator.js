@@ -109,7 +109,7 @@ function makeOp(kind, maxAddSub, maxMul, maxDiv) {
   if (kind === "add") return { kind, n: randInt(1, maxAddSub) };
   if (kind === "sub") return { kind, n: randInt(1, maxAddSub) };
   if (kind === "mul") return { kind, n: randInt(2, maxMul) };
-  return { kind, n: randInt(2, maxDiv) }; // div
+  return { kind, n: randInt(2, maxDiv) };
 }
 
 function isInverseOp(a, b) {
@@ -134,7 +134,7 @@ function pickNonInverseOp(prevOp, kinds, maxAddSub, maxMul, maxDiv) {
 }
 
 /**
- * Generates a puzzle and trims the last dangling cell (so you don't see the extra tail square).
+ * Trims last dangling cell so you don't get the extra tail square.
  */
 function generatePuzzle(layoutName = "snake1") {
   const fullLayout = layouts[layoutName];
@@ -164,7 +164,6 @@ function generatePuzzle(layoutName = "snake1") {
   const kinds = effectiveKinds(allowed, maxAddSub, maxMul, maxDiv);
   if (!kinds.length) throw new Error("No operations are usable (checked + max values).");
 
-  // Trim to last value cell so the puzzle doesn't end with an extra cell
   const typesFull = buildCellTypes(fullLayout.length);
   const lastValIdxFull = lastValueIndex(typesFull);
 
@@ -225,7 +224,7 @@ function generatePuzzle(layoutName = "snake1") {
   throw new Error("Could not generate a puzzle with those constraints. Loosen bounds or reduce Multiply/Divide.");
 }
 
-/* ===== Rendering + scaling ===== */
+/* ===== Rendering + scaling (screen) ===== */
 
 function ensureSizer(gridEl) {
   const parent = gridEl.parentElement;
@@ -275,6 +274,7 @@ function renderTo(targetId, puzzle, showAnswers) {
     } else {
       const val = puzzle.valuesByIndex[idx];
       const isFinal = (idx === puzzle.lastValIdx);
+
       if (isFinal) cell.textContent = String(val);
       else if (showAnswers) cell.textContent = String(val);
       else { cell.textContent = ""; cell.classList.add("blank"); }
@@ -283,7 +283,7 @@ function renderTo(targetId, puzzle, showAnswers) {
     grid.appendChild(cell);
   }
 
-  // Screen-fit scaling only
+  // screen-fit scaling
   const sizer = ensureSizer(grid);
   const { width, height } = measurePuzzlePixelSize(puzzle.cols, puzzle.rows);
 
@@ -307,20 +307,6 @@ function renderTo(targetId, puzzle, showAnswers) {
   sizer.style.height = `${height}px`;
 }
 
-function clearSizerInline(targetId) {
-  const grid = $(targetId);
-  if (!grid) return;
-  const sizer = grid.parentElement;
-  if (!sizer || !sizer.classList.contains("worksheetSizer")) return;
-
-  sizer.style.transform = "";
-  sizer.style.removeProperty("--scale");
-  sizer.style.width = "";
-  sizer.style.height = "";
-  sizer.style.removeProperty("--grid-w");
-  sizer.style.removeProperty("--grid-h");
-}
-
 /* ===== App actions ===== */
 
 function rerender() {
@@ -330,7 +316,6 @@ function rerender() {
   renderTo("worksheet1", CURRENT.puzzles[0], show);
   renderTo("worksheet2", CURRENT.puzzles[1], show);
 
-  // keys always rendered (print toggles visibility)
   renderTo("key1", CURRENT.puzzles[0], true);
   renderTo("key2", CURRENT.puzzles[1], true);
 }
@@ -347,58 +332,165 @@ function generate() {
   }
 }
 
-/**
- * iOS/WebKit-safe print: wait for the DOM/class change to actually apply
- * before calling window.print().
- */
-function printAfterLayoutSettles(includeKey) {
-  if (includeKey) document.body.classList.add("printingWithKey");
-  else document.body.classList.remove("printingWithKey");
+/* ===== iOS-safe printing: open a dedicated print window ===== */
 
-  rerender();
+function cssHrefForPrint() {
+  // assumes your stylesheet link exists and is local, e.g. <link rel="stylesheet" href="styles.css">
+  const link = document.querySelector('link[rel="stylesheet"]');
+  return link ? link.getAttribute("href") : null;
+}
 
-  // iOS print overlap fix: clear screen scaling so print CSS can flow
-  clearSizerInline("worksheet1");
-  clearSizerInline("worksheet2");
-  clearSizerInline("key1");
-  clearSizerInline("key2");
+function serializeGridForPrint(puzzle, showAllAnswers) {
+  // build markup that looks like your on-page grid, but without any transform scaling wrappers
+  let html = `<div class="worksheet" style="--cols:${puzzle.cols};">`;
 
-  // Force a reflow (so class/display changes are committed)
-  void document.body.offsetHeight;
+  for (let idx = 0; idx < puzzle.layout.length; idx++) {
+    const [x, y] = puzzle.layout[idx];
+    const t = puzzle.cellTypes[idx];
 
-  // Wait 2 frames + a tiny timeout. This is the part that fixes iOS Chrome.
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        window.print();
-      }, 120);
-    });
-  });
+    let classes = "cell";
+    let text = "";
+
+    if (idx === 0) {
+      text = String(puzzle.valuesByIndex[0]);
+    } else if (t === "op") {
+      classes += " op";
+      text = formatOp(puzzle.opsByIndex[idx]);
+    } else {
+      const val = puzzle.valuesByIndex[idx];
+      const isFinal = (idx === puzzle.lastValIdx);
+
+      if (isFinal || showAllAnswers) text = String(val);
+      else classes += " blank";
+    }
+
+    html += `<div class="${classes}" style="grid-column:${x + 1};grid-row:${y + 1};">${text}</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function openPrintWindow({ includeKey }) {
+  if (CURRENT.puzzles.length !== 2) {
+    setStatus("No puzzles yet. Click Generate Puzzles first.");
+    return;
+  }
+
+  const styleHref = cssHrefForPrint();
+  if (!styleHref) {
+    setStatus("Couldn't find your stylesheet link tag. Make sure index.html has <link rel='stylesheet' href='styles.css'>.");
+    return;
+  }
+
+  // In the print window we always hide controls and show the content stacked.
+  const p1 = CURRENT.puzzles[0];
+  const p2 = CURRENT.puzzles[1];
+
+  // For the main puzzles: honor the on-screen Display Answers toggle
+  const showOnPuzzle = readChecked("showAnswers");
+
+  // For the answer key page: always show answers
+  const key1 = serializeGridForPrint(p1, true);
+  const key2 = serializeGridForPrint(p2, true);
+
+  const puzzle1 = serializeGridForPrint(p1, showOnPuzzle);
+  const puzzle2 = serializeGridForPrint(p2, showOnPuzzle);
+
+  // IMPORTANT: page break must generate a box (height:1px) or WebKit may ignore it. :contentReference[oaicite:2]{index=2}
+  const breaker = `<div class="pageBreak" style="height:1px;"></div>`;
+
+  const keySection = includeKey
+    ? `
+      ${breaker}
+      <section class="answerKeySection" style="display:block;">
+        <div class="puzzleBlock">
+          <div class="puzzleTitle">ANSWER KEY</div>
+        </div>
+        <div class="stack">
+          <div class="puzzleBlock">
+            <div class="puzzleTitle">PUZZLE 1</div>
+            <div class="puzzleCard">${key1}</div>
+          </div>
+          <div class="puzzleBlock">
+            <div class="puzzleTitle">PUZZLE 2</div>
+            <div class="puzzleCard">${key2}</div>
+          </div>
+        </div>
+      </section>
+    `
+    : "";
+
+  const docHtml = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Print</title>
+  <link rel="stylesheet" href="${styleHref}">
+  <style>
+    /* extra safety: ensure no transforms in print window */
+    .worksheetSizer{ transform: none !important; width:auto !important; height:auto !important; }
+    .controlsCard{ display:none !important; }
+    /* ensure answerKeySection prints if present */
+    .answerKeySection{ display:block; }
+  </style>
+</head>
+<body class="${includeKey ? "printingWithKey" : ""}">
+  <div class="page">
+    <section class="sheet">
+      <div class="stack">
+        <div class="puzzleBlock">
+          <div class="puzzleTitle">PUZZLE 1</div>
+          <div class="puzzleCard">${puzzle1}</div>
+        </div>
+
+        <div class="puzzleBlock">
+          <div class="puzzleTitle">PUZZLE 2</div>
+          <div class="puzzleCard">${puzzle2}</div>
+        </div>
+      </div>
+    </section>
+
+    ${keySection}
+  </div>
+
+  <script>
+    // Wait for layout to settle, then print.
+    // requestAnimationFrame triggers after a paint. :contentReference[oaicite:3]{index=3}
+    window.onload = function(){
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          setTimeout(function(){
+            window.print();
+          }, 150);
+        });
+      });
+    };
+  </script>
+</body>
+</html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) {
+    setStatus("Popup blocked. Allow popups for this site to print on iOS.");
+    return;
+  }
+  w.document.open();
+  w.document.write(docHtml);
+  w.document.close();
 }
 
 function printPuzzlesOnly() {
-  if (CURRENT.puzzles.length !== 2) {
-    setStatus("No puzzles yet. Click Generate Puzzles first.");
-    return;
-  }
   setStatus("");
-  printAfterLayoutSettles(false);
+  openPrintWindow({ includeKey: false });
 }
 
 function printPuzzlesWithKey() {
-  if (CURRENT.puzzles.length !== 2) {
-    setStatus("No puzzles yet. Click Generate Puzzles first.");
-    return;
-  }
   setStatus("");
-  printAfterLayoutSettles(true);
+  openPrintWindow({ includeKey: true });
 }
-
-// Best-effort cleanup (afterprint is inconsistent on iOS, but harmless)
-window.addEventListener("afterprint", () => {
-  document.body.classList.remove("printingWithKey");
-  rerender();
-});
 
 function wireUI() {
   $("btnGenerate").addEventListener("click", generate);
