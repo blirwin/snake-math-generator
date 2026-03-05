@@ -9,6 +9,7 @@
   --radius: 14px;
   --radius-sm: 10px;
 
+  /* puzzle sizing (screen) */
   --cell-w: 102px;
   --cell-h: 82px;
   --cell-gap: 16px;
@@ -21,7 +22,7 @@ html, body{
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
 }
 
 .page{
@@ -50,6 +51,7 @@ html, body{
   margin: 0;
 }
 
+/* Card */
 .card{
   background: var(--card);
   border: 1px solid var(--border);
@@ -58,9 +60,91 @@ html, body{
   padding: 18px;
 }
 
-/* Controls (keep what you already had; this is just safe defaults) */
-.controlsCard{ }
+/* Callout */
+.callout{
+  border: 1px solid var(--border);
+  background: #fbfbfd;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
 
+.calloutTitle{
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.calloutText{
+  font-size: 13px;
+  line-height: 1.4;
+  color: #374151;
+}
+
+/* Compact input panel */
+.inputPanel{
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.inputRow{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  align-items: center;
+}
+
+.inputRow + .inputRow{
+  margin-top: 12px;
+}
+
+.fieldInline{
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.labelInline{
+  font-size: 13px;
+  font-weight: 800;
+  color: #374151;
+  min-width: 120px; /* keeps a tidy column feel */
+}
+
+.inputSmall{
+  width: 8ch;            /* room for ~4 digits comfortably */
+  min-width: 8ch;
+  max-width: 8ch;
+
+  padding: 10px 12px;
+  font-size: 15px;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: #fff;
+  outline: none;
+
+  text-align: center;    /* numbers look cleaner centered */
+}
+
+.inputSmall:focus{
+  border-color: #9ca3af;
+  box-shadow: 0 0 0 3px rgba(17,24,39,0.08);
+}
+
+.miniHint{
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Section headers */
 .sectionHeader{
   margin-top: 16px;
   margin-bottom: 10px;
@@ -71,6 +155,7 @@ html, body{
   text-transform: uppercase;
 }
 
+/* Pills */
 .pillRow{
   display: flex;
   flex-wrap: wrap;
@@ -88,15 +173,19 @@ html, body{
   background: #fbfbfd;
 }
 
-.pillTight{ padding: 10px 12px; }
 .pill input{ width: 18px; height: 18px; }
-.pill span{ font-size: 14px; font-weight: 800; color: #111827; }
 
-.actionRow{
+.pill span{
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+}
+
+/* Buttons */
+.buttonRow{
   margin-top: 16px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 12px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -148,8 +237,6 @@ html, body{
   display: flex;
   flex-direction: column;
   gap: 10px;
-  break-inside: avoid;
-  page-break-inside: avoid;
 }
 
 .puzzleTitle{
@@ -170,14 +257,15 @@ html, body{
   overflow: hidden;
 }
 
-/* Screen-fit scaling wrapper */
+/* Scaled wrapper inserted by JS */
 .worksheetSizer{
   transform-origin: top left;
   transform: scale(var(--scale, 1));
-  width: var(--grid-w, auto);
-  height: var(--grid-h, auto);
+  width: var(--grid-w, 0px);
+  height: var(--grid-h, 0px);
 }
 
+/* Grid */
 .worksheet{
   display: grid;
   gap: var(--cell-gap);
@@ -185,9 +273,9 @@ html, body{
   grid-auto-columns: var(--cell-w);
   grid-auto-rows: var(--cell-h);
   grid-template-columns: repeat(var(--cols, 12), var(--cell-w));
-  overflow: visible;
 }
 
+/* Cells */
 .cell{
   width: var(--cell-w);
   height: var(--cell-h);
@@ -204,15 +292,22 @@ html, body{
 .cell.op{ background: #e5e7eb; }
 .cell.blank{ background: #fff; }
 
-/* Answer page hidden on screen by default */
+/* Answer key hidden on screen */
 .answerKeySection{ display: none; }
+.pageBreak{ display: block; }
 
-/* This must exist in DOM for print, but can be hidden on screen */
-.pageBreak{
-  display: none;
+/* Responsive */
+@media (max-width: 980px){
+  .page{ padding: 24px 18px 32px; }
+  .labelInline{ min-width: 110px; }
 }
 
-/* PRINT */
+@media (max-width: 560px){
+  .labelInline{ min-width: auto; }
+  .miniHint{ white-space: normal; }
+}
+
+/* Print */
 @media print{
   :root{
     --bg: #ffffff;
@@ -234,18 +329,20 @@ html, body{
     margin: 0;
   }
 
-  .controlsCard{ display: none !important; }
+  .controlsCard{ display: none; }
 
-  .sheet{
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
+  .card, .sheet{
+    box-shadow: none;
+    border: none;
+    padding: 0;
   }
 
+  .sheet{ margin-top: 18px; }
+
   .puzzleCard{
-    border: none !important;
-    padding: 0 !important;
-    overflow: visible !important;
+    border: none;
+    padding: 0;
+    overflow: visible;
   }
 
   .cell{
@@ -253,32 +350,32 @@ html, body{
     font-size: 22px;
   }
 
-  /* keep grey shading on ops */
   .cell.op{
     background: #e5e7eb !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* CRITICAL: iOS print + transforms can overlap content */
-  .worksheetSizer{
-    transform: none !important;
-    width: auto !important;
-    height: auto !important;
-  }
-
-  /* Only show answer page when we explicitly enable it */
-  .answerKeySection{ display: none !important; }
-  body.printingWithKey .answerKeySection{ display: block !important; }
-
   /*
-    CRITICAL: page break must generate a box. Empty divs can be ignored in print layout.
-    Give it minimal height so page-break applies reliably. :contentReference[oaicite:1]{index=1}
+    CRITICAL FIX #1:
+    break-before/page-break-before is ignored if the element doesn't generate a box.
+    Give the breaker a tiny height so it *definitely* generates a box in print.
+    :contentReference[oaicite:1]{index=1}
   */
   .pageBreak{
-    display: block !important;
-    height: 1px;                 /* generates a box */
+    display: block;
+    height: 1px;
     break-before: page;
-    page-break-before: always;   /* legacy */
+    page-break-before: always;
   }
+
+  .answerKeySection{ display: none; }
+  body.printingWithKey .answerKeySection{ display: block; }
+
+  /*
+    CRITICAL FIX #2:
+    WebKit printing + transforms can cause overlapping/ignored pagination.
+    Disable transforms entirely in print.
+  */
+  .worksheetSizer{ transform: none !important; width: auto !important; height: auto !important; }
 }
